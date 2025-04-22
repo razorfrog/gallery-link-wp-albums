@@ -26,9 +26,25 @@ if (WP_GALLERY_LINK_DEBUG) {
     error_log('Google Photos Albums plugin initialized with path: ' . WP_GALLERY_LINK_PATH);
 }
 
-// Include the necessary files - make sure to use the correct path (src/includes)
-require_once WP_GALLERY_LINK_PATH . 'src/includes/class-wp-gallery-link-cpt.php';
-require_once WP_GALLERY_LINK_PATH . 'src/includes/class-wp-gallery-link-admin.php'; // Include admin class
+// Include the necessary files
+// Check if files exist before requiring them
+if (file_exists(WP_GALLERY_LINK_PATH . 'includes/class-wp-gallery-link-cpt.php')) {
+    require_once WP_GALLERY_LINK_PATH . 'includes/class-wp-gallery-link-cpt.php';
+} else if (file_exists(WP_GALLERY_LINK_PATH . 'src/includes/class-wp-gallery-link-cpt.php')) {
+    require_once WP_GALLERY_LINK_PATH . 'src/includes/class-wp-gallery-link-cpt.php';
+} else {
+    error_log('Critical error: class-wp-gallery-link-cpt.php not found in either includes/ or src/includes/ directories');
+}
+
+if (file_exists(WP_GALLERY_LINK_PATH . 'includes/class-wp-gallery-link-admin.php')) {
+    require_once WP_GALLERY_LINK_PATH . 'includes/class-wp-gallery-link-admin.php';
+} else if (file_exists(WP_GALLERY_LINK_PATH . 'src/includes/class-wp-gallery-link-admin.php')) {
+    require_once WP_GALLERY_LINK_PATH . 'src/includes/class-wp-gallery-link-admin.php';
+} else {
+    error_log('Warning: class-wp-gallery-link-admin.php not found in either includes/ or src/includes/ directories');
+}
+
+// Load the main plugin file
 require_once WP_GALLERY_LINK_PATH . 'wp-gallery-link.php';
 
 // Initialize admin functionality

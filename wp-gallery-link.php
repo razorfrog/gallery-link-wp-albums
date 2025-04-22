@@ -52,35 +52,62 @@ class WP_Gallery_Link {
             $this->log('WP Gallery Link: Main class initialized', 'info');
         }
         
-        // Check if CPT class exists, if not include it
-        if (!class_exists('WP_Gallery_Link_CPT')) {
-            require_once WP_GALLERY_LINK_PATH . 'src/includes/class-wp-gallery-link-cpt.php';
-            if (WP_GALLERY_LINK_DEBUG) {
-                $this->log('WP Gallery Link: CPT class file included', 'info');
+        // Locate and load the CPT class
+        $cpt_class_loaded = false;
+        
+        // Try different possible file paths
+        $possible_cpt_paths = array(
+            WP_GALLERY_LINK_PATH . 'includes/class-wp-gallery-link-cpt.php',
+            WP_GALLERY_LINK_PATH . 'src/includes/class-wp-gallery-link-cpt.php'
+        );
+        
+        foreach ($possible_cpt_paths as $path) {
+            if (file_exists($path)) {
+                require_once $path;
+                $this->log('WP Gallery Link: CPT class file included from ' . $path, 'info');
+                $cpt_class_loaded = true;
+                break;
             }
+        }
+        
+        if (!$cpt_class_loaded && !class_exists('WP_Gallery_Link_CPT')) {
+            $this->log('WP Gallery Link: Could not find CPT class file', 'error');
+            add_action('admin_notices', function() {
+                echo '<div class="error"><p>Google Photos Albums: Critical error - Could not find CPT class file.</p></div>';
+            });
+            return;
         }
         
         // Initialize CPT
         $this->cpt = new WP_Gallery_Link_CPT();
         
-        // Check if Google API class exists, if not include it
-        if (!class_exists('WP_Gallery_Link_Google_API')) { 
-            if (file_exists(WP_GALLERY_LINK_PATH . 'src/includes/class-wp-gallery-link-google-api.php')) {
-                require_once WP_GALLERY_LINK_PATH . 'src/includes/class-wp-gallery-link-google-api.php';
-                if (WP_GALLERY_LINK_DEBUG) {
-                    $this->log('WP Gallery Link: Google API class file included', 'info');
-                }
+        // Load Google API class
+        $google_api_loaded = false;
+        
+        // Try different possible file paths
+        $possible_api_paths = array(
+            WP_GALLERY_LINK_PATH . 'includes/class-wp-gallery-link-google-api.php',
+            WP_GALLERY_LINK_PATH . 'src/includes/class-wp-gallery-link-google-api.php'
+        );
+        
+        foreach ($possible_api_paths as $path) {
+            if (file_exists($path)) {
+                require_once $path;
+                $this->log('WP Gallery Link: Google API class file included from ' . $path, 'info');
+                
                 // Initialize Google API
                 $this->google_api = new WP_Gallery_Link_Google_API();
-            } else {
-                // Create a stub Google API class for development purposes
-                $this->google_api = new stdClass();
-                $this->google_api->is_connected = function() { return false; };
-                $this->google_api->get_auth_url = function() { return '#'; };
-                if (WP_GALLERY_LINK_DEBUG) {
-                    $this->log('WP Gallery Link: Using stub Google API class', 'info');
-                }
+                $google_api_loaded = true;
+                break;
             }
+        }
+        
+        if (!$google_api_loaded) {
+            // Create a stub Google API class for development purposes
+            $this->log('WP Gallery Link: Using stub Google API class', 'info');
+            $this->google_api = new stdClass();
+            $this->google_api->is_connected = function() { return false; };
+            $this->google_api->get_auth_url = function() { return '#'; };
         }
         
         // Setup AJAX hooks
