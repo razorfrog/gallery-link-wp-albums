@@ -1,4 +1,3 @@
-
 jQuery(document).ready(function($) {
     'use strict';
     
@@ -347,18 +346,34 @@ jQuery(document).ready(function($) {
     /**
      * Handle album import
      */
-    $(document).on('click', '.wpgl-import-album', function() {
-        const $button = $(this);
-        const albumId = $button.data('id');
+    function handleImportAlbum(albumId) {
+        logDebug('Handling import for album ID:', albumId);
         
         if (!albumId) {
-            logDebug('No album ID found for import button');
+            logDebug('No album ID provided');
             return;
         }
         
-        $button.prop('disabled', true).text(wpglAdmin.i18n.importing);
+        // Find the button for this album
+        const $button = $(`.wpgl-import-album[data-id="${albumId}"]`);
+        if (!$button.length) {
+            logDebug('Import button not found for album ID:', albumId);
+            return;
+        }
+        
+        // Prevent double clicks
+        if ($button.prop('disabled')) {
+            logDebug('Button already disabled, preventing duplicate import');
+            return;
+        }
+        
+        $button.prop('disabled', true).text(wpglAdmin.i18n ? wpglAdmin.i18n.importing : 'Importing...');
         
         logDebug('Importing album with ID:', albumId);
+        console.log('WP Gallery Link: Importing album with ID:', albumId);
+        
+        // Add a timestamp to prevent caching
+        const timestamp = new Date().getTime();
         
         $.ajax({
             url: wpglAdmin.ajaxUrl,
@@ -366,16 +381,18 @@ jQuery(document).ready(function($) {
             data: {
                 action: 'wpgl_import_album',
                 album_id: albumId,
-                nonce: wpglAdmin.nonce // Use the nonce from wpglAdmin
+                nonce: wpglAdmin.nonce,
+                _nocache: timestamp // Cache-busting parameter
             },
             success: function(response) {
                 logDebug('Album import response:', response);
+                console.log('WP Gallery Link: Album import response:', response);
                 
                 if (response.success) {
-                    // Success UI updates - show message and button changes
+                    // Success UI updates
                     $button.removeClass('button-primary')
                           .addClass('button-secondary')
-                          .text(wpglAdmin.i18n.imported);
+                          .text(wpglAdmin.i18n ? wpglAdmin.i18n.imported : 'Imported');
                     
                     // Show the album ID and info in the console for debugging
                     console.log('Successfully imported album:', albumId, response);
@@ -395,19 +412,39 @@ jQuery(document).ready(function($) {
                     }
                     
                     // Show success message
-                    alert(wpglAdmin.i18n.import_success);
+                    alert(wpglAdmin.i18n ? wpglAdmin.i18n.import_success : 'Album imported successfully!');
                 } else {
                     const errorMsg = response.data && response.data.message ? response.data.message : 'Unknown error';
-                    alert(`${wpglAdmin.i18n.import_error} ${errorMsg}`);
-                    $button.prop('disabled', false).text(wpglAdmin.i18n.import);
+                    alert(wpglAdmin.i18n ? `${wpglAdmin.i18n.import_error} ${errorMsg}` : `Import error: ${errorMsg}`);
+                    $button.prop('disabled', false).text(wpglAdmin.i18n ? wpglAdmin.i18n.import : 'Import');
+                    
+                    console.error('Album import error:', errorMsg, response);
                 }
             },
             error: function(xhr, status, error) {
                 logDebug('Album import error:', { xhr: xhr, status: status, error: error });
-                alert(`${wpglAdmin.i18n.import_error} ${error}`);
-                $button.prop('disabled', false).text(wpglAdmin.i18n.import);
+                console.error('WP Gallery Link: AJAX error during import:', error, xhr.responseText);
+                
+                alert(wpglAdmin.i18n ? `${wpglAdmin.i18n.import_error} ${error}` : `Import error: ${error}`);
+                $button.prop('disabled', false).text(wpglAdmin.i18n ? wpglAdmin.i18n.import : 'Import');
             }
         });
+    }
+    
+    // Use direct event delegation for import buttons to ensure they work after dynamic loading
+    $(document).on('click', '.wpgl-import-album', function(e) {
+        e.preventDefault(); // Prevent default button behavior
+        
+        console.log('Import button clicked');
+        const albumId = $(this).data('id');
+        console.log('Album ID from button:', albumId);
+        
+        if (!albumId) {
+            console.error('No album ID found for this button');
+            return;
+        }
+        
+        handleImportAlbum(albumId);
     });
     
     /**
@@ -569,9 +606,21 @@ jQuery(document).ready(function($) {
         addLoadingLog('Stopping album loading process...');
     });
     
-    // Bulk import button
-    $(document).on('click', '#wpgl-bulk-import', function() {
+    // Bulk import button - using direct binding with event delegation
+    $(document).on('click', '#wpgl-bulk-import', function(e) {
+        e.preventDefault();
+        console.log('Bulk import button clicked');
         bulkImportAlbums();
+    });
+    
+    // Import all button - using direct binding with event delegation
+    $(document).on('click', '#wpgl-import-all', function(e) {
+        e.preventDefault();
+        console.log('Import all button clicked');
+        // Select all albums first
+        $('#wpgl-select-all').prop('checked', true).trigger('change');
+        // Then trigger bulk import
+        $('#wpgl-bulk-import').trigger('click');
     });
     
     // Debug button for demo loading - DISABLED
@@ -591,8 +640,18 @@ jQuery(document).ready(function($) {
         }
     }
     
-    // Directly hook into document ready
+    // Directly hook into document ready with additional initialization
     $(document).ready(function() {
         console.log('WP Gallery Link: Document ready event fired');
+        
+        // Force cache refresh on all AJAX requests
+        $.ajaxSetup({
+            cache: false
+        });
+        
+        // Log all import buttons that exist on page load
+        $('.wpgl-import-album').each(function() {
+            console.log('Found import button with ID:', $(this).data('id'));
+        });
     });
 });

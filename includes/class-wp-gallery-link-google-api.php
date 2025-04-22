@@ -327,19 +327,37 @@ class WP_Gallery_Link_Google_API {
      * AJAX: Import album
      */
     public function ajax_import_album() {
-        // Check nonce - using wpgl_nonce instead of wpgl_debug
+        // Check nonce
         if (!check_ajax_referer('wpgl_nonce', 'nonce', false)) {
-            wp_send_json_error(array('message' => __('Security check failed', 'wp-gallery-link')));
+            wp_gallery_link()->log('Import album nonce check failed', 'error', $_REQUEST);
+            wp_send_json_error(array('message' => __('Security check failed. Please refresh the page and try again.', 'wp-gallery-link')));
             return;
         }
         
         // Get album data
-        $album_id = isset($_POST['album_id']) ? $_POST['album_id'] : '';
+        $album_id = isset($_POST['album_id']) ? sanitize_text_field($_POST['album_id']) : '';
         
         if (empty($album_id)) {
             wp_gallery_link()->log('Import error: No album ID', 'error');
             wp_send_json_error(array('message' => __('No album ID provided', 'wp-gallery-link')));
             return;
+        }
+        
+        // Log the import attempt with request details
+        wp_gallery_link()->log('Album import requested', 'info', array(
+            'album_id' => $album_id,
+            'is_bulk' => isset($_POST['bulk']) ? 'yes' : 'no',
+            'timestamp' => current_time('mysql'),
+            'cache_buster' => isset($_POST['_nocache']) ? $_POST['_nocache'] : 'not_set'
+        ));
+        
+        // Check authorization
+        if (!$this->is_authorized()) {
+            if (!$this->refresh_access_token()) {
+                wp_gallery_link()->log('Album import error: Not authorized', 'error');
+                wp_send_json_error(array('message' => __('Not authorized with Google Photos. Please reconnect your account.', 'wp-gallery-link')));
+                return;
+            }
         }
         
         // Get album details from API
@@ -362,12 +380,14 @@ class WP_Gallery_Link_Google_API {
         
         wp_gallery_link()->log('Album imported successfully: ' . $album_data['title'], 'info', array('post_id' => $post_id));
         
-        // Return success
+        // Return success with more detailed information
         wp_send_json_success(array(
             'message' => sprintf(__('Album "%s" imported successfully', 'wp-gallery-link'), $album_data['title']),
             'post_id' => $post_id,
             'edit_url' => get_edit_post_link($post_id, 'url'),
-            'view_url' => get_permalink($post_id)
+            'view_url' => get_permalink($post_id),
+            'album_title' => $album_data['title'],
+            'timestamp' => current_time('mysql')
         ));
     }
     
