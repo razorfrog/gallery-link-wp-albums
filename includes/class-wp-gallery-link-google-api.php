@@ -362,21 +362,21 @@ class WP_Gallery_Link_Google_API {
             }
         }
         
-        // Get album details from API
-        $album_data = $this->get_album_details($album_id);
+        // Make a direct API call to get album details using albums.get endpoint
+        $album_details = $this->get_album_details_direct($album_id);
         
-        if (is_wp_error($album_data)) {
-            wp_gallery_link()->log('Album import error: ' . $album_data->get_error_message(), 'error');
-            wp_send_json_error(array('message' => $album_data->get_error_message()));
+        if (is_wp_error($album_details)) {
+            wp_gallery_link()->log('Album details fetch error: ' . $album_details->get_error_message(), 'error');
+            wp_send_json_error(array('message' => $album_details->get_error_message()));
             return;
         }
         
-        // IMPORTANT: Log the raw album data before processing
-        wp_gallery_link()->log('Raw album data before processing', 'debug', $album_data);
-        error_log('WP Gallery Link raw album data: ' . wp_json_encode($album_data));
+        // IMPORTANT: Log the raw album details we got from the direct API call
+        wp_gallery_link()->log('Raw album details from direct API call', 'debug', $album_details);
+        error_log('WP Gallery Link direct albums.get API response: ' . wp_json_encode($album_details));
         
         // Create album post
-        $post_id = $this->create_album_post($album_data);
+        $post_id = $this->create_album_post($album_details);
         
         if (is_wp_error($post_id)) {
             wp_gallery_link()->log('Album post creation error: ' . $post_id->get_error_message(), 'error');
@@ -384,30 +384,31 @@ class WP_Gallery_Link_Google_API {
             return;
         }
         
-        wp_gallery_link()->log('Album imported successfully: ' . $album_data['title'], 'info', array('post_id' => $post_id));
+        wp_gallery_link()->log('Album imported successfully: ' . $album_details['title'], 'info', array('post_id' => $post_id));
         
         // Return success with more detailed information and include the raw creation time
         wp_send_json_success(array(
-            'message' => sprintf(__('Album "%s" imported successfully', 'wp-gallery-link'), $album_data['title']),
+            'message' => sprintf(__('Album "%s" imported successfully', 'wp-gallery-link'), $album_details['title']),
             'post_id' => $post_id,
             'edit_url' => get_edit_post_link($post_id, 'url'),
             'view_url' => get_permalink($post_id),
-            'album_title' => $album_data['title'],
-            'album_date_raw' => $album_data['creationTime'], // Include raw date for debugging
+            'album_title' => $album_details['title'],
+            'album_date_raw' => $album_details['creationTime'], // Include raw date for debugging
             'album_date_saved' => get_post_meta($post_id, '_gphoto_album_date', true), // Include what was actually saved
+            'album_id' => $album_id,
             'timestamp' => current_time('mysql'),
-            'debug_redirect' => 'false', // Flag to disable redirect
-            'raw_api_response' => $album_data['_raw_response'] // Include the full API response
+            'debug_redirect' => 'false',
+            'raw_api_response' => $album_details // Include the full API response
         ));
     }
     
     /**
-     * Get album details from API
+     * Get album details directly from the albums.get endpoint
      * 
      * @param string $album_id
      * @return array|WP_Error Album details or error
      */
-    public function get_album_details($album_id) {
+    public function get_album_details_direct($album_id) {
         // Check authorization
         if (!$this->is_authorized()) {
             if (!$this->refresh_access_token()) {
@@ -415,22 +416,25 @@ class WP_Gallery_Link_Google_API {
             }
         }
         
-        // Build API request
-        $url = 'https://photoslibrary.googleapis.com/v1/albums/' . $album_id;
+        // Build API request for the albums.get endpoint
+        $url = 'https://photoslibrary.googleapis.com/v1/albums/' . urlencode($album_id);
         $args = array(
             'headers' => array(
                 'Authorization' => 'Bearer ' . get_option('wpgl_google_access_token'),
                 'Content-Type' => 'application/json'
-            )
+            ),
+            'timeout' => 30 // Longer timeout for API requests
         );
         
         // Make API request
-        wp_gallery_link()->log('Fetching album details: ' . $album_id, 'info');
+        wp_gallery_link()->log('Fetching album details directly using albums.get: ' . $album_id, 'info');
+        error_log('WP Gallery Link: Making direct albums.get API call for album ID: ' . $album_id);
+        
         $response = wp_remote_get($url, $args);
         
         // Check for errors
         if (is_wp_error($response)) {
-            wp_gallery_link()->log('Album details fetch error: ' . $response->get_error_message(), 'error');
+            wp_gallery_link()->log('Direct album details fetch error: ' . $response->get_error_message(), 'error');
             return new WP_Error('api_error', $response->get_error_message());
         }
         
@@ -438,59 +442,58 @@ class WP_Gallery_Link_Google_API {
         $body = json_decode(wp_remote_retrieve_body($response), true);
         $status_code = wp_remote_retrieve_response_code($response);
         
+        // Log the complete raw response for debugging
+        error_log('DIRECT GOOGLE PHOTOS API RESPONSE: ' . wp_json_encode($body));
+        wp_gallery_link()->log('Direct album.get response (status: ' . $status_code . ')', 'debug', $body);
+        
         // Check for API errors
         if ($status_code !== 200) {
             $error_message = isset($body['error']['message']) ? $body['error']['message'] : __('Unknown API error', 'wp-gallery-link');
-            wp_gallery_link()->log('Album details API error: ' . $error_message, 'error', $body);
+            wp_gallery_link()->log('Direct album details API error: ' . $error_message . ' (code ' . $status_code . ')', 'error', $body);
             return new WP_Error('api_error', $error_message);
         }
         
-        // Write the FULL ALBUM response to error logs for inspection
-        error_log('GOOGLE PHOTOS FULL API RESPONSE: ' . wp_json_encode($body));
-        wp_gallery_link()->log('Complete album response', 'debug', $body);
+        // Extract creation date - Check multiple places
+        $creation_time = '';
         
-        // DIRECTLY CHECK AND LOG THE creationTime FROM THE ROOT LEVEL
-        if (isset($body['creationTime'])) {
-            error_log('DIRECT creationTime FOUND: ' . $body['creationTime']);
-            wp_gallery_link()->log('DIRECT creationTime FOUND:', 'info', $body['creationTime']);
-        } else {
-            error_log('NO DIRECT creationTime FOUND IN ALBUM ROOT');
-            wp_gallery_link()->log('NO DIRECT creationTime FOUND IN ALBUM ROOT', 'warning');
+        if (!empty($body['creationTime'])) {
+            $creation_time = $body['creationTime'];
+            error_log('Using direct creationTime from albums.get: ' . $creation_time);
+            wp_gallery_link()->log('Found creationTime in direct API call', 'info', $creation_time);
+        }
+        elseif (!empty($body['mediaItemsContainerInfo']['creationTime'])) {
+            $creation_time = $body['mediaItemsContainerInfo']['creationTime'];
+            error_log('Using mediaItemsContainerInfo.creationTime from albums.get: ' . $creation_time);
+            wp_gallery_link()->log('Found creationTime in mediaItemsContainerInfo', 'info', $creation_time);
         }
         
-        // Also check for alternate date fields Google might be using
-        foreach ($body as $key => $value) {
-            if (strpos(strtolower($key), 'date') !== false || strpos(strtolower($key), 'time') !== false) {
-                $field_value = is_string($value) ? $value : wp_json_encode($value);
-                error_log("DATE/TIME FIELD FOUND: {$key} = {$field_value}");
-                wp_gallery_link()->log("DATE/TIME FIELD FOUND: {$key}", 'info', $value);
+        // Fall back to searching the title for date information
+        if (empty($creation_time)) {
+            error_log('No creation date found in API. Attempting to extract from title: ' . $body['title']);
+            
+            // Try to extract date from title using common date formats
+            if (preg_match('/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/', $body['title'], $matches)) {
+                $month = $matches[1];
+                $day = $matches[2];
+                $year = $matches[3];
+                
+                // Format year properly if it's 2-digit
+                if (strlen($year) == 2) {
+                    $year = '20' . $year; // Assume 2000s
+                }
+                
+                $extracted_date = $year . '-' . str_pad($month, 2, '0', STR_PAD_LEFT) . '-' . str_pad($day, 2, '0', STR_PAD_LEFT);
+                $creation_time = $extracted_date . 'T00:00:00Z';
+                
+                error_log('Extracted date from title: ' . $creation_time);
+                wp_gallery_link()->log('Extracted date from title', 'info', array(
+                    'title' => $body['title'],
+                    'extracted_date' => $creation_time
+                ));
             }
         }
         
-        // Get creation time - CHECK ALL LOCATIONS
-        $creation_time = '';
-        
-        // ORDERED BY PRIORITY - DIRECT FIELD FIRST
-        if (isset($body['creationTime'])) {
-            $creation_time = $body['creationTime'];
-            error_log('Using direct creationTime: ' . $creation_time);
-            wp_gallery_link()->log('Using direct creationTime', 'info', $creation_time);
-        } 
-        elseif (isset($body['mediaItemsContainerInfo']['creationTime'])) {
-            $creation_time = $body['mediaItemsContainerInfo']['creationTime'];
-            error_log('Using mediaItemsContainerInfo.creationTime: ' . $creation_time);
-            wp_gallery_link()->log('Using mediaItemsContainerInfo.creationTime', 'info', $creation_time);
-        }
-        elseif (isset($body['shareInfo']['sharedAt'])) {
-            $creation_time = $body['shareInfo']['sharedAt'];
-            error_log('Using shareInfo.sharedAt as fallback: ' . $creation_time);
-            wp_gallery_link()->log('Using shareInfo.sharedAt as fallback', 'info', $creation_time);
-        } 
-        else {
-            error_log('NO CREATION TIME FOUND ANYWHERE IN ALBUM DATA');
-            wp_gallery_link()->log('No creation time found in standard locations', 'warning', array_keys($body));
-        }
-        
+        // Prepare album data with creation time
         return array(
             'id' => $body['id'],
             'title' => $body['title'],
@@ -501,6 +504,18 @@ class WP_Gallery_Link_Google_API {
             'creationTime' => $creation_time,
             '_raw_response' => $body // Include full raw response for debugging
         );
+    }
+    
+    /**
+     * Get album details from API
+     * 
+     * @param string $album_id
+     * @return array|WP_Error Album details or error
+     */
+    public function get_album_details($album_id) {
+        // This method is kept for backward compatibility
+        // We now use get_album_details_direct for more accurate data
+        return $this->get_album_details_direct($album_id);
     }
     
     /**
@@ -567,18 +582,18 @@ class WP_Gallery_Link_Google_API {
             'album_title' => $album_data['title']
         ));
         
-        // Store the original date format as metadata for diagnosis ALWAYS
+        // Always store the original date format as metadata
         if (!empty($album_data['creationTime'])) {
             update_post_meta($post_id, '_gphoto_album_raw_date', $album_data['creationTime']);
             error_log('Saved raw date: ' . $album_data['creationTime']);
         }
         
-        // Try multiple date formats with improved approach
+        // Try to parse the date from multiple sources with improved approach
         if (!empty($album_data['creationTime'])) {
             $creation_time = $album_data['creationTime'];
             $parsed_timestamp = false;
             
-            // Method 1: Try with DateTime first (most reliable)
+            // Try with DateTime first (most reliable)
             try {
                 $date = new DateTime($creation_time);
                 $parsed_timestamp = $date->getTimestamp();
@@ -589,7 +604,7 @@ class WP_Gallery_Link_Google_API {
                 error_log('DateTime parsing failed: ' . $e->getMessage());
                 wp_gallery_link()->log('DateTime parsing failed', 'warning', $e->getMessage());
                 
-                // Method 2: Fallback to strtotime
+                // Fallback to strtotime
                 $parsed_timestamp = strtotime($creation_time);
                 if ($parsed_timestamp !== false) {
                     $formatted_date = date('Y-m-d', $parsed_timestamp);
@@ -601,17 +616,33 @@ class WP_Gallery_Link_Google_API {
                 }
             }
             
-            // If all parsing failed, try manual ISO 8601 format extraction
+            // If all parsing failed, try manual extraction
             if ($parsed_timestamp === false) {
                 if (preg_match('/(\d{4}-\d{2}-\d{2})/', $creation_time, $matches)) {
                     $formatted_date = $matches[1];
                     error_log('Manual regex extraction successful: ' . $formatted_date);
                     wp_gallery_link()->log('Manual regex extraction successful', 'info', $formatted_date);
                 } else {
-                    // Last resort: use today's date
-                    $formatted_date = date('Y-m-d');
-                    error_log('All parsing failed, using today\'s date: ' . $formatted_date);
-                    wp_gallery_link()->log('All parsing failed, using current date', 'warning');
+                    // Last resort: try to extract from title
+                    if (preg_match('/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/', $album_data['title'], $matches)) {
+                        $month = $matches[1];
+                        $day = $matches[2];
+                        $year = $matches[3];
+                        
+                        // Format year properly if it's 2-digit
+                        if (strlen($year) == 2) {
+                            $year = '20' . $year; // Assume 2000s
+                        }
+                        
+                        $formatted_date = $year . '-' . str_pad($month, 2, '0', STR_PAD_LEFT) . '-' . str_pad($day, 2, '0', STR_PAD_LEFT);
+                        error_log('Extracted date from title: ' . $formatted_date);
+                        wp_gallery_link()->log('Extracted date from title', 'info', $formatted_date);
+                    } else {
+                        // Last resort: use today's date
+                        $formatted_date = date('Y-m-d');
+                        error_log('All parsing failed, using today\'s date: ' . $formatted_date);
+                        wp_gallery_link()->log('All parsing failed, using current date', 'warning');
+                    }
                 }
             }
             
@@ -621,10 +652,28 @@ class WP_Gallery_Link_Google_API {
             wp_gallery_link()->log('Saved album date', 'info', $formatted_date);
             
         } else {
-            // No creation time available, use current date
-            error_log('No creation date found in API response, using today\'s date');
-            wp_gallery_link()->log('No creation date found, using current date', 'warning');
-            update_post_meta($post_id, '_gphoto_album_date', date('Y-m-d'));
+            // Try to extract date from title if no creation time available
+            if (preg_match('/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/', $album_data['title'], $matches)) {
+                $month = $matches[1];
+                $day = $matches[2];
+                $year = $matches[3];
+                
+                // Format year properly if it's 2-digit
+                if (strlen($year) == 2) {
+                    $year = '20' . $year; // Assume 2000s
+                }
+                
+                $formatted_date = $year . '-' . str_pad($month, 2, '0', STR_PAD_LEFT) . '-' . str_pad($day, 2, '0', STR_PAD_LEFT);
+                error_log('No creation date in API, extracted from title: ' . $formatted_date);
+                wp_gallery_link()->log('No creation date in API, extracted from title', 'info', $formatted_date);
+                
+                update_post_meta($post_id, '_gphoto_album_date', $formatted_date);
+            } else {
+                // No creation time available and couldn't extract from title, use current date
+                error_log('No creation date found in API response or title, using today\'s date');
+                wp_gallery_link()->log('No creation date found in API or title, using current date', 'warning');
+                update_post_meta($post_id, '_gphoto_album_date', date('Y-m-d'));
+            }
         }
 
         return $post_id;

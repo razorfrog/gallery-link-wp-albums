@@ -10,7 +10,7 @@ if (!defined('WPINC')) {
 }
 
 // Plugin version
-define('WP_GALLERY_LINK_VERSION', '1.0.12');
+define('WP_GALLERY_LINK_VERSION', '1.0.13');
 
 // Make sure constants are defined; you may already set these in the main plugin file elsewhere
 if (!defined('WP_GALLERY_LINK_DEBUG')) {
