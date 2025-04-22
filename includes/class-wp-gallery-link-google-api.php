@@ -437,20 +437,44 @@ class WP_Gallery_Link_Google_API {
             return new WP_Error('api_error', $error_message);
         }
         
-        // Log the response for debugging
-        wp_gallery_link()->log('Album details fetched successfully', 'debug', array(
-            'album_id' => $album_id,
-            'title' => $body['title'],
-            'media_count' => isset($body['mediaItemsCount']) ? $body['mediaItemsCount'] : 0,
-            'creation_time' => isset($body['mediaItemsContainerInfo']['creationTime']) ? $body['mediaItemsContainerInfo']['creationTime'] : 'Not available'
-        ));
+        // EXTENDED DEBUGGING - Log the entire response structure
+        wp_gallery_link()->log('FULL ALBUM RESPONSE', 'debug', $body);
+        error_log('WP Gallery Link: Complete album response: ' . wp_json_encode($body));
         
-        // Add detailed debug logging for the album API response
-        if (WP_GALLERY_LINK_DEBUG) {
-            error_log('WP Gallery Link: Full album response structure: ' . json_encode($body));
+        // Debug any date related fields
+        $date_fields = array();
+        foreach ($body as $key => $value) {
+            if (strpos(strtolower($key), 'date') !== false || strpos(strtolower($key), 'time') !== false) {
+                $date_fields[$key] = $value;
+            }
+            // Also check nested structures
+            if (is_array($value)) {
+                foreach ($value as $sub_key => $sub_value) {
+                    if (strpos(strtolower($sub_key), 'date') !== false || strpos(strtolower($sub_key), 'time') !== false) {
+                        $date_fields[$key.'.'.$sub_key] = $sub_value;
+                    }
+                }
+            }
+        }
+        wp_gallery_link()->log('Date-related fields found in response:', 'info', $date_fields);
+        
+        // Return album details - try multiple possible locations for creation date
+        $creation_time = '';
+        
+        // Check all possible locations for creation date
+        if (isset($body['mediaItemsContainerInfo']['creationTime'])) {
+            $creation_time = $body['mediaItemsContainerInfo']['creationTime'];
+            wp_gallery_link()->log('Found creation time in mediaItemsContainerInfo', 'info', $creation_time);
+        } elseif (isset($body['creationTime'])) {
+            $creation_time = $body['creationTime'];
+            wp_gallery_link()->log('Found creation time in root object', 'info', $creation_time);
+        } else {
+            // Log what we did find
+            wp_gallery_link()->log('No creation time found in standard locations', 'warning', array(
+                'available_fields' => array_keys($body)
+            ));
         }
         
-        // Return album details with creation date included if available
         return array(
             'id' => $body['id'],
             'title' => $body['title'],
@@ -458,10 +482,7 @@ class WP_Gallery_Link_Google_API {
             'coverPhotoBaseUrl' => isset($body['coverPhotoBaseUrl']) ? $body['coverPhotoBaseUrl'] : '',
             'productUrl' => isset($body['productUrl']) ? $body['productUrl'] : '',
             'isWriteable' => isset($body['isWriteable']) ? $body['isWriteable'] : false,
-            // Check multiple possible locations for the creation date
-            'creationTime' => isset($body['mediaItemsContainerInfo']['creationTime']) 
-                ? $body['mediaItemsContainerInfo']['creationTime'] 
-                : (isset($body['creationTime']) ? $body['creationTime'] : '')
+            'creationTime' => $creation_time
         );
     }
     
@@ -521,22 +542,37 @@ class WP_Gallery_Link_Google_API {
             update_post_meta($post_id, '_gphoto_photo_count', intval($album_data['mediaItemsCount']));
         }
         
-        // Handle creation date with extended debugging
+        // UPDATED DATE HANDLING - Log everything for debugging
+        wp_gallery_link()->log('Album creation time data', 'debug', array(
+            'raw_creation_time' => isset($album_data['creationTime']) ? $album_data['creationTime'] : 'NOT SET',
+            'album_id' => $album_data['id'],
+            'album_title' => $album_data['title']
+        ));
+        
+        // Use a fallback system with extensive logging
         if (!empty($album_data['creationTime'])) {
             $creation_time = $album_data['creationTime'];
-            // Log the raw creation time
-            wp_gallery_link()->log('Raw album creation time: ' . $creation_time, 'debug');
+            wp_gallery_link()->log('Raw creation time: ' . $creation_time, 'debug');
             
-            // Parse the date and log the result
+            // Parse the date with error checking
             $parsed_timestamp = strtotime($creation_time);
-            $formatted_date = date('Y-m-d', $parsed_timestamp);
-            wp_gallery_link()->log('Parsed album date: ' . $formatted_date . ' (from timestamp ' . $parsed_timestamp . ')', 'debug');
             
-            // Save the parsed date
+            if ($parsed_timestamp === false) {
+                wp_gallery_link()->log('Failed to parse date: ' . $creation_time, 'error');
+                // Use current date as fallback
+                $formatted_date = date('Y-m-d');
+                wp_gallery_link()->log('Using current date as fallback', 'info');
+            } else {
+                $formatted_date = date('Y-m-d', $parsed_timestamp);
+                wp_gallery_link()->log('Successfully parsed date: ' . $formatted_date, 'info');
+            }
+            
             update_post_meta($post_id, '_gphoto_album_date', $formatted_date);
+            wp_gallery_link()->log('Saved album date: ' . $formatted_date, 'info');
+            
         } else {
-            // Set today's date as fallback
-            wp_gallery_link()->log('No creation date found, using today\'s date as fallback', 'info');
+            // No creation time available
+            wp_gallery_link()->log('No creation date found, using today\'s date', 'info');
             update_post_meta($post_id, '_gphoto_album_date', date('Y-m-d'));
         }
 
@@ -717,4 +753,3 @@ class WP_Gallery_Link_Google_API {
         }
     }
 }
-
