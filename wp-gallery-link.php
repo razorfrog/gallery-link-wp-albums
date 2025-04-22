@@ -36,11 +36,26 @@ class WP_Gallery_Link {
             error_log('WP Gallery Link: Main class initialized');
         }
         
+        // Check if CPT class exists, if not include it
+        if (!class_exists('WP_Gallery_Link_CPT')) {
+            require_once plugin_dir_path(__FILE__) . 'includes/class-wp-gallery-link-cpt.php';
+            if (WP_GALLERY_LINK_DEBUG) {
+                error_log('WP Gallery Link: CPT class file included');
+            }
+        }
+        
         // Initialize CPT
         $this->cpt = new WP_Gallery_Link_CPT();
         
-        // Initialize Google API if needed
-        // $this->google_api = new WP_Gallery_Link_Google_API();
+        // Check if Google API class exists, if not include it
+        if (!class_exists('WP_Gallery_Link_Google_API') && false) { // disabled for now
+            require_once plugin_dir_path(__FILE__) . 'includes/class-wp-gallery-link-google-api.php';
+            if (WP_GALLERY_LINK_DEBUG) {
+                error_log('WP Gallery Link: Google API class file included');
+            }
+            // Initialize Google API
+            // $this->google_api = new WP_Gallery_Link_Google_API();
+        }
         
         // Setup AJAX hooks
         add_action('wp_ajax_wpgl_import_album', array($this, 'ajax_import_album'));
