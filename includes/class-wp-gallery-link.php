@@ -1,3 +1,4 @@
+
 <?php
 /**
  * Main plugin class for Google Photos Albums
@@ -301,7 +302,17 @@ class WP_Gallery_Link {
         
         $this->log('WP Gallery Link: Attempting to import album ID ' . $album_id . ($is_bulk ? ' (bulk import)' : ''), 'info');
         
-        // Mock album data for testing
+        // CRITICAL: Check if we have a Google API instance and use it instead of mock data
+        if (isset($this->google_api) && method_exists($this->google_api, 'ajax_import_album')) {
+            $this->log('WP Gallery Link: Delegating import to Google API class', 'info');
+            $this->google_api->ajax_import_album();
+            return;
+        }
+        
+        // If we reach here, we don't have a working Google API class
+        $this->log('WP Gallery Link: Google API class not available for import, using fallback', 'warning');
+        
+        // Mock album data for testing - This should never be used in production
         $album_data = array(
             'id' => $album_id,
             'title' => 'Test Album ' . time(),
@@ -309,9 +320,6 @@ class WP_Gallery_Link {
             'mediaItemsCount' => 10,
             'coverPhotoBaseUrl' => 'https://lh3.googleusercontent.com/sample-photo-url'
         );
-        
-        // In a real implementation, you would use the Google API to get the album data
-        // $album_data = $this->google_api->get_album($album_id);
         
         $this->log('WP Gallery Link: Album data prepared - Title: ' . $album_data['title'], 'info');
         
