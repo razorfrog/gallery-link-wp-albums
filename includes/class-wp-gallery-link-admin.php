@@ -95,13 +95,25 @@ class WP_Gallery_Link_Admin {
             true
         );
         
-        // Check if demo mode is enabled
-        $demo_mode = isset($_GET['demo']) && $_GET['demo'] === 'true';
+        // Check if demo mode is enabled - explicit check to avoid any issues
+        $demo_mode = false;
+        if (isset($_GET['demo']) && $_GET['demo'] === 'true') {
+            $demo_mode = true;
+        }
+        // Also check for demo mode filter
+        if (apply_filters('wpgl_is_demo_mode', false)) {
+            $demo_mode = true;
+        }
+        
+        // Log the demo mode status
+        if (WP_GALLERY_LINK_DEBUG) {
+            error_log('WP Gallery Link: Demo mode is ' . ($demo_mode ? 'enabled' : 'disabled'));
+        }
         
         wp_localize_script('wp-gallery-link-admin', 'wpglAdmin', array(
             'ajaxUrl' => admin_url('admin-ajax.php'),
             'nonce' => wp_create_nonce('wpgl_nonce'),
-            'debugMode' => WP_GALLERY_LINK_DEBUG,
+            'debugMode' => defined('WP_GALLERY_LINK_DEBUG') && WP_GALLERY_LINK_DEBUG,
             'demoMode' => $demo_mode,
             'loadAllAlbums' => true,
             'i18n' => array(
@@ -119,7 +131,6 @@ class WP_Gallery_Link_Admin {
         
         if (WP_GALLERY_LINK_DEBUG) {
             error_log('WP Gallery Link Admin: Scripts and styles enqueued for ' . $hook);
-            error_log('WP Gallery Link Admin: Demo mode is ' . ($demo_mode ? 'enabled' : 'disabled'));
         }
     }
     
@@ -318,8 +329,19 @@ class WP_Gallery_Link_Admin {
             $is_connected = $main->google_api->is_connected();
         }
         
-        // Demo mode check 
-        $demo_mode = isset($_GET['demo']) && $_GET['demo'] === 'true';
+        // Demo mode check - explicit check to avoid any issues
+        $demo_mode = false;
+        if (isset($_GET['demo']) && $_GET['demo'] === 'true') {
+            $demo_mode = true;
+        }
+        // Also check for demo mode filter
+        if (apply_filters('wpgl_is_demo_mode', false)) {
+            $demo_mode = true;
+        }
+        
+        if (WP_GALLERY_LINK_DEBUG) {
+            error_log('WP Gallery Link Admin: Rendering import page with demo mode ' . ($demo_mode ? 'enabled' : 'disabled'));
+        }
         ?>
         <div class="wrap">
             <h1><?php _e('Import Albums from Google Photos', 'wp-gallery-link'); ?></h1>

@@ -49,13 +49,13 @@ function wpgl_include_file($filename, $paths) {
     return false;
 }
 
+// Include the main file first to prevent class not found errors
+wpgl_include_file('wp-gallery-link.php', $include_paths);
+
 // Include the necessary class files
 wpgl_include_file('class-wp-gallery-link-cpt.php', $include_paths);
 wpgl_include_file('class-wp-gallery-link-admin.php', $include_paths);
 wpgl_include_file('class-wp-gallery-link-shortcode.php', $include_paths);
-
-// Load the main plugin file
-wpgl_include_file('wp-gallery-link.php', $include_paths);
 
 // Create a function that initializes the plugin admin interface
 function wpgl_init_admin() {
@@ -72,7 +72,8 @@ function wpgl_init_admin() {
 function wpgl_check_demo_mode() {
     if (isset($_GET['demo']) && $_GET['demo'] === 'true' && 
         isset($_GET['page']) && $_GET['page'] === 'wp-gallery-link-import') {
-        // Do nothing here, we'll handle this in the admin.js script
+        // Force demo mode to be true
+        add_filter('wpgl_is_demo_mode', function() { return true; });
     }
 }
 
@@ -103,3 +104,9 @@ function wpgl_ajax_import_album_wrapper() {
         wp_send_json_error(array('message' => 'Method ajax_import_album not found in main plugin class'));
     }
 }
+
+// Log plugin initialization completion
+if (WP_GALLERY_LINK_DEBUG) {
+    error_log('Google Photos Albums plugin initialization completed');
+}
+

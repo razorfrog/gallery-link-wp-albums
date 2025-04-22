@@ -25,6 +25,10 @@ jQuery(document).ready(function($) {
         }
     }
     
+    // Immediately log that the script has loaded
+    logDebug('Admin script initialized');
+    console.log('WP Gallery Link admin.js loaded successfully');
+    
     /**
      * Add a message to the loading log
      */
@@ -63,16 +67,19 @@ jQuery(document).ready(function($) {
     }
     
     /**
-     * Render an album in the grid
+     * Render an album in the grid - NO TEMPLATES, direct HTML creation
      */
     function renderAlbum(album) {
+        logDebug('Rendering album:', album);
+        console.log('Rendering album with ID:', album.id, 'and title:', album.title);
+
         const $albumsGrid = $('.wpgl-albums-grid');
         
         if ($albumsGrid.length) {
             // Create a default cover image if one isn't provided
             const coverImageUrl = album.coverPhotoBaseUrl || 'https://via.placeholder.com/200x200?text=No+Cover';
             
-            // Create album HTML directly without using a template
+            // Create album HTML directly - NO TEMPLATES
             const albumHtml = `
                 <div class="wpgl-album" data-id="${album.id}">
                     <div class="wpgl-album-cover-container">
@@ -91,8 +98,9 @@ jQuery(document).ready(function($) {
             `;
             
             $albumsGrid.append(albumHtml);
-            logDebug('Album rendered:', album.title);
+            logDebug('Album rendered successfully:', album.title);
         } else {
+            console.error('WP Gallery Link: Albums grid container not found!');
             logDebug('ERROR: Album grid container not found!');
         }
     }
@@ -138,6 +146,9 @@ jQuery(document).ready(function($) {
      * Load albums from the API
      */
     function loadAlbums() {
+        logDebug('loadAlbums function called');
+        console.log('WP Gallery Link: loadAlbums function called');
+        
         if (cancelLoading) {
             addLoadingLog('Album loading canceled by user.');
             hideLoadingUI();
@@ -167,11 +178,12 @@ jQuery(document).ready(function($) {
         updateLoadingStatus('Fetching albums...');
         updateProgress(10);
         
-        // Log the AJAX URL and request data for debugging
-        logDebug('AJAX request data:', data);
+        // Log all important variables for debugging
+        console.log('AJAX request data:', data);
+        console.log('wpglAdmin object:', wpglAdmin);
         
         if (typeof wpglAdmin === 'undefined' || !wpglAdmin.ajaxUrl) {
-            logDebug('ERROR: wpglAdmin.ajaxUrl is not defined!');
+            console.error('WP Gallery Link: wpglAdmin.ajaxUrl is not defined!');
             addLoadingLog('Error: WordPress AJAX URL not found. Is the plugin properly loaded?');
             isLoading = false;
             hideLoadingUI();
@@ -186,12 +198,13 @@ jQuery(document).ready(function($) {
             data: data,
             dataType: 'json',
             success: function(response) {
-                logDebug('Albums API response:', response);
+                console.log('Album API response received:', response);
                 
                 if (response.success) {
                     const albums = response.data.albums || [];
                     nextPageToken = response.data.nextPageToken || '';
                     
+                    console.log('Found', albums.length, 'albums in this batch');
                     addLoadingLog(`Found ${albums.length} albums in this batch.`);
                     
                     totalAlbums += albums.length;
@@ -205,7 +218,6 @@ jQuery(document).ready(function($) {
                         albumsFound.push(album);
                         addAlbumToList(album.title);
                         renderAlbum(album);
-                        logDebug('Album processed:', album.title);
                     });
                     
                     updateProgress(75);
@@ -231,17 +243,16 @@ jQuery(document).ready(function($) {
                     }
                 } else {
                     const errorMsg = response.data && response.data.message ? response.data.message : 'Unknown error';
+                    console.error('API Error:', errorMsg, response);
                     addLoadingLog(`Error: ${errorMsg}`);
                     isLoading = false;
                     hideLoadingUI();
                     updateProgress(0);
-                    
-                    logDebug('API Error:', response);
                 }
             },
             error: function(xhr, status, error) {
+                console.error('AJAX Error:', error, xhr.responseText);
                 addLoadingLog(`AJAX Error: ${error}`);
-                logDebug('AJAX Error Details:', { xhr: xhr, status: status, error: error });
                 
                 // Try to get more detailed error information
                 let errorDetails = 'No additional details available.';
@@ -259,9 +270,6 @@ jQuery(document).ready(function($) {
                 isLoading = false;
                 hideLoadingUI();
                 updateProgress(0);
-            },
-            complete: function() {
-                logDebug('Album loading AJAX request completed');
             }
         });
     }
@@ -364,14 +372,10 @@ jQuery(document).ready(function($) {
     // Run diagnostic check on page load
     function runDiagnostic() {
         logDebug('Running diagnostic check...');
+        console.log('WP Gallery Link: Running diagnostic check...');
         
         // Debug information for templates
-        logDebug('Checking for album template elements');
-        if ($('.wpgl-album-template').length) {
-            logDebug('Found album template element');
-        } else {
-            logDebug('No album template element found, will use direct HTML rendering');
-        }
+        console.log('Checking for DOM elements...');
         
         // Check if we have the wpglAdmin object
         if (typeof wpglAdmin === 'undefined') {
@@ -384,7 +388,7 @@ jQuery(document).ready(function($) {
         if (startBtn.length === 0) {
             console.error('WP Gallery Link: Start button not found in DOM.');
         } else {
-            logDebug('Start button found with ID:', startBtn.attr('id'));
+            console.log('WP Gallery Link: Start button found with ID:', startBtn.attr('id'));
         }
         
         // Check if the album grid container exists
@@ -392,8 +396,17 @@ jQuery(document).ready(function($) {
         if (albumsGrid.length === 0) {
             console.error('WP Gallery Link: Albums grid container not found in DOM.');
         } else {
-            logDebug('Albums grid found with class:', albumsGrid.attr('class'));
+            console.log('WP Gallery Link: Albums grid found with class:', albumsGrid.attr('class'));
         }
+        
+        // Display DOM structure for debugging
+        console.log('DOM structure of import page:');
+        $('.wpgl-import-container').each(function() {
+            console.log('Import container found');
+            $(this).children().each(function() {
+                console.log('- Child element:', this.tagName, this.className || '(no class)');
+            });
+        });
         
         logDebug('Diagnostic completed');
     }
@@ -411,18 +424,31 @@ jQuery(document).ready(function($) {
         }
     }
     
-    // Explicitly trigger rendering of demo albums for testing
+    // Explicitly trigger rendering of demo albums for testing when demo mode is active
     if (typeof wpglAdmin !== 'undefined' && wpglAdmin.demoMode === true) {
-        logDebug('Demo mode is active, will load sample albums automatically');
+        console.log('WP Gallery Link: Demo mode is active, will load sample albums automatically');
         setTimeout(function() {
+            console.log('WP Gallery Link: Auto-triggering album load in demo mode');
             if ($('#wpgl-start-loading').length) {
                 $('#wpgl-start-loading').trigger('click');
             } else {
-                logDebug('Could not find start loading button to auto-trigger');
+                console.error('WP Gallery Link: Could not find start loading button to auto-trigger');
                 // Try to manually start loading
                 resetAlbumLoading();
                 loadAlbums();
             }
         }, 500);
     }
+    
+    // Direct trigger for start button click handlers
+    $(document).on('ready', function() {
+        console.log('WP Gallery Link: Document ready event fired');
+        $('#wpgl-start-loading').on('click', function(e) {
+            console.log('WP Gallery Link: Start loading button clicked');
+            e.preventDefault();
+            resetAlbumLoading();
+            loadAlbums();
+        });
+    });
 });
+
