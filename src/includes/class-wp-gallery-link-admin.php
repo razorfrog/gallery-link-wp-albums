@@ -278,9 +278,23 @@ class WP_Gallery_Link_Admin {
                 </div>
                 
                 <div class="wpgl-album-list">
-                    <div id="wpgl-albums-loading">
-                        <span class="spinner is-active"></span>
-                        <?php _e('Loading albums...', 'wp-gallery-link'); ?>
+                    <div class="wpgl-status-panel">
+                        <div id="wpgl-albums-loading" class="wpgl-loading-status">
+                            <span class="spinner is-active"></span>
+                            <?php _e('Loading albums...', 'wp-gallery-link'); ?>
+                        </div>
+                        
+                        <div class="wpgl-progress-wrapper">
+                            <div class="wpgl-progress-container">
+                                <progress id="wpgl-loading-progress" value="0" max="100" class="wpgl-progress"></progress>
+                                <span id="wpgl-loading-progress-text" class="wpgl-progress-text">0%</span>
+                            </div>
+                        </div>
+                        
+                        <div class="wpgl-log-wrapper">
+                            <h4><?php _e('Status Log', 'wp-gallery-link'); ?></h4>
+                            <div id="wpgl-loading-log" class="wpgl-loading-log"></div>
+                        </div>
                     </div>
                     
                     <div id="wpgl-albums-container"></div>
@@ -289,6 +303,20 @@ class WP_Gallery_Link_Admin {
                         <button id="wpgl-load-more" class="button" style="display:none;">
                             <?php _e('Load More', 'wp-gallery-link'); ?>
                         </button>
+                    </div>
+                    
+                    <div class="wpgl-demo-mode">
+                        <p>
+                            <strong><?php _e('Demo Mode:', 'wp-gallery-link'); ?></strong>
+                            <?php _e('Not seeing any albums? Try demo mode to see how the plugin works.', 'wp-gallery-link'); ?>
+                        </p>
+                        <a href="?page=wp-gallery-link-import&demo=true" class="button"><?php _e('Load Demo Albums', 'wp-gallery-link'); ?></a>
+                        
+                        <?php if (isset($_GET['demo']) && $_GET['demo'] === 'true'): ?>
+                            <p class="wpgl-demo-notice">
+                                <em><?php _e('Demo mode is active. The albums shown are for demonstration purposes only.', 'wp-gallery-link'); ?></em>
+                            </p>
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>

@@ -1,3 +1,4 @@
+
 /**
  * Admin JavaScript for WP Gallery Link
  */
@@ -13,6 +14,9 @@
     var $albumsContainer = $('#wpgl-albums-container');
     var $loadingIndicator = $('#wpgl-albums-loading');
     var $loadMoreButton = $('#wpgl-load-more');
+    var $progressBar = $('#wpgl-loading-progress');
+    var $progressText = $('#wpgl-loading-progress-text');
+    var $loadingLog = $('#wpgl-loading-log');
     
     /**
      * Initialize the admin JavaScript
@@ -23,8 +27,14 @@
             return;
         }
         
+        // Update UI to show initialization
+        addLogMessage('Initializing WP Gallery Link...');
+        updateProgress(5);
+        
         // Load albums
-        loadAlbums();
+        setTimeout(function() {
+            loadAlbums();
+        }, 500);
         
         // Event handlers
         $loadMoreButton.on('click', loadAlbums);
@@ -34,6 +44,41 @@
         
         // Debug info
         console.log('WP Gallery Link admin.js initialized');
+    }
+    
+    /**
+     * Update progress bar
+     * 
+     * @param {number} value Progress value (0-100)
+     */
+    function updateProgress(value) {
+        if ($progressBar.length) {
+            $progressBar.val(value);
+            if ($progressText.length) {
+                $progressText.text(value + '%');
+            }
+        }
+    }
+    
+    /**
+     * Add log message
+     * 
+     * @param {string} message Log message
+     */
+    function addLogMessage(message) {
+        if ($loadingLog.length) {
+            var timestamp = new Date().toLocaleTimeString();
+            var logItem = $('<div class="wpgl-log-item"></div>')
+                .html('<span class="wpgl-log-time">[' + timestamp + ']</span> ' + message);
+            
+            $loadingLog.append(logItem);
+            
+            // Scroll to bottom
+            $loadingLog.scrollTop($loadingLog[0].scrollHeight);
+        }
+        
+        // Also log to console
+        console.log('[WP Gallery Link] ' + message);
     }
     
     /**
@@ -48,34 +93,48 @@
         $loadingIndicator.show();
         $loadMoreButton.hide();
         
+        // Update UI
+        addLogMessage('Loading albums...');
+        updateProgress(10);
+        
         // Debug info
         console.log('Loading albums, pageToken:', pageToken);
         
         // For demo/testing purposes, simulate successful API response
         if (window.location.href.indexOf('demo=true') > -1) {
             console.log('DEMO MODE: Simulating album data');
+            addLogMessage('DEMO MODE: Simulating API response');
+            updateProgress(25);
+            
             setTimeout(function() {
-                var demoData = {
-                    success: true,
-                    data: {
-                        albums: [
-                            {
-                                id: 'album1',
-                                title: 'Summer Vacation',
-                                mediaItemsCount: 42,
-                                coverPhotoBaseUrl: '/placeholder.svg'
-                            },
-                            {
-                                id: 'album2',
-                                title: 'Family Gathering',
-                                mediaItemsCount: 78,
-                                coverPhotoBaseUrl: '/placeholder.svg'
-                            }
-                        ],
-                        nextPageToken: 'demo-next-page'
-                    }
-                };
-                handleAlbumResponse(demoData);
+                addLogMessage('DEMO MODE: Processing album data');
+                updateProgress(50);
+                
+                setTimeout(function() {
+                    var demoData = {
+                        success: true,
+                        data: {
+                            albums: [
+                                {
+                                    id: 'album1',
+                                    title: 'Summer Vacation',
+                                    mediaItemsCount: 42,
+                                    coverPhotoBaseUrl: '/placeholder.svg'
+                                },
+                                {
+                                    id: 'album2',
+                                    title: 'Family Gathering',
+                                    mediaItemsCount: 78,
+                                    coverPhotoBaseUrl: '/placeholder.svg'
+                                }
+                            ],
+                            nextPageToken: 'demo-next-page'
+                        }
+                    };
+                    updateProgress(100);
+                    addLogMessage('DEMO MODE: Albums loaded successfully');
+                    handleAlbumResponse(demoData);
+                }, 1000);
             }, 1000);
             return;
         }
@@ -90,10 +149,14 @@
             },
             success: function(response) {
                 console.log('API Response:', response);
+                updateProgress(75);
+                addLogMessage('Albums received from API');
                 handleAlbumResponse(response);
             },
             error: function(xhr, status, error) {
                 console.error('API Error:', error);
+                updateProgress(100);
+                addLogMessage('Error loading albums: ' + error);
                 showError(wpgl_vars.i18n.error_loading + ' ' + error);
                 isLoading = false;
                 $loadingIndicator.hide();
@@ -115,21 +178,29 @@
             
             // Render albums
             if (data.albums && data.albums.length > 0) {
+                updateProgress(90);
+                addLogMessage('Rendering ' + data.albums.length + ' albums');
                 renderAlbums(data.albums);
             } else {
                 if ($albumsContainer.children().length === 0) {
                     $albumsContainer.html('<p>No albums found in your Google Photos account.</p>');
+                    addLogMessage('No albums found');
                 }
             }
             
             // Show/hide load more button
             if (pageToken) {
                 $loadMoreButton.show();
+                addLogMessage('More albums available. Click "Load More" to continue.');
+            } else {
+                addLogMessage('All albums loaded successfully');
             }
         } else {
             showError(response.data || wpgl_vars.i18n.error_loading);
+            addLogMessage('Error: ' + (response.data || 'Failed to load albums'));
         }
         
+        updateProgress(100);
         isLoading = false;
         $loadingIndicator.hide();
     }
@@ -140,26 +211,92 @@
      * @param {Array} newAlbums Albums to render
      */
     function renderAlbums(newAlbums) {
-        var template = wp.template('wpgl-album-item');
-        
-        // Check for existing albums
-        checkExistingAlbums(newAlbums).then(function(checkedAlbums) {
-            // Store albums
-            albums = albums.concat(checkedAlbums);
-            
-            // Render albums
-            var html = '';
-            
-            $.each(checkedAlbums, function(i, album) {
-                html += template(album);
-            });
-            
-            if ($albumsContainer.children().length === 0) {
-                $albumsContainer.html(html);
-            } else {
-                $albumsContainer.append(html);
+        try {
+            // First check if wp.template is available
+            if (typeof wp === 'undefined' || typeof wp.template !== 'function') {
+                // Fallback to manual HTML generation if template function is not available
+                console.warn('wp.template function not available, using fallback rendering');
+                addLogMessage('Using fallback rendering method');
+                renderAlbumsFallback(newAlbums);
+                return;
             }
+            
+            var template = wp.template('wpgl-album-item');
+            
+            // Check for existing albums
+            checkExistingAlbums(newAlbums).then(function(checkedAlbums) {
+                // Store albums
+                albums = albums.concat(checkedAlbums);
+                
+                // Render albums
+                var html = '';
+                
+                $.each(checkedAlbums, function(i, album) {
+                    html += template(album);
+                });
+                
+                if ($albumsContainer.children().length === 0) {
+                    $albumsContainer.html(html);
+                } else {
+                    $albumsContainer.append(html);
+                }
+                
+                addLogMessage('Albums rendered successfully');
+            });
+        } catch (error) {
+            console.error('Error rendering albums:', error);
+            addLogMessage('Error rendering albums: ' + error.message);
+            renderAlbumsFallback(newAlbums);
+        }
+    }
+    
+    /**
+     * Fallback method to render albums when wp.template is not available
+     * 
+     * @param {Array} newAlbums Albums to render
+     */
+    function renderAlbumsFallback(newAlbums) {
+        // Store albums
+        albums = albums.concat(newAlbums);
+        
+        // Render albums with manual HTML
+        var html = '';
+        
+        $.each(newAlbums, function(i, album) {
+            var coverImg = album.coverPhotoBaseUrl ? 
+                '<img src="' + album.coverPhotoBaseUrl + '=w200-h200" alt="' + album.title + '">' :
+                '<div class="wpgl-no-thumbnail">No Cover</div>';
+                
+            html += '<div class="wpgl-album-item" data-id="' + album.id + '">' +
+                    '<div class="wpgl-album-thumbnail">' + coverImg + '</div>' +
+                    '<div class="wpgl-album-details">' +
+                    '<h3 class="wpgl-album-title">' + album.title + '</h3>' +
+                    '<div class="wpgl-album-meta">';
+                    
+            if (album.mediaItemsCount) {
+                html += '<span class="wpgl-album-count">' + album.mediaItemsCount + ' items</span>';
+            }
+                    
+            html += '</div>' +
+                    '<div class="wpgl-album-actions">';
+                    
+            if (album.imported) {
+                html += '<a href="' + album.editLink + '" class="button button-secondary">Edit</a> ' +
+                        '<a href="' + album.viewLink + '" class="button button-secondary" target="_blank">View</a>';
+            } else {
+                html += '<button class="button button-primary wpgl-import-album" data-id="' + album.id + '">Import</button>';
+            }
+                    
+            html += '</div></div></div>';
         });
+        
+        if ($albumsContainer.children().length === 0) {
+            $albumsContainer.html(html);
+        } else {
+            $albumsContainer.append(html);
+        }
+        
+        addLogMessage('Albums rendered with fallback method');
     }
     
     /**
@@ -188,6 +325,8 @@
         $button.prop('disabled', true).addClass('wpgl-importing');
         $button.html('<span class="spinner is-active"></span>' + wpgl_vars.i18n.importing);
         
+        addLogMessage('Importing album: ' + albumId);
+        
         $.ajax({
             url: wpgl_vars.ajaxurl,
             type: 'POST',
@@ -198,6 +337,8 @@
             },
             success: function(response) {
                 if (response.success) {
+                    addLogMessage('Album imported successfully: ' + albumId);
+                    
                     // Update the button to show success
                     $button.removeClass('wpgl-importing button-primary')
                         .addClass('button-secondary')
@@ -205,10 +346,8 @@
                         .delay(1500)
                         .queue(function(next) {
                             // Replace with edit/view buttons
-                            var html = '<a href="' + response.data.edit_link + '" class="button button-secondary">' +
-                                       '<?php _e("Edit", "wp-gallery-link"); ?></a> ' +
-                                       '<a href="' + response.data.view_link + '" class="button button-secondary" target="_blank">' +
-                                       '<?php _e("View", "wp-gallery-link"); ?></a>';
+                            var html = '<a href="' + response.data.edit_link + '" class="button button-secondary">Edit</a> ' +
+                                       '<a href="' + response.data.view_link + '" class="button button-secondary" target="_blank">View</a>';
                             
                             $(this).replaceWith(html);
                             next();
@@ -224,19 +363,21 @@
                         }
                     }
                 } else {
+                    addLogMessage('Error importing album: ' + (response.data || 'Unknown error'));
                     showError(response.data || wpgl_vars.i18n.import_error);
                     
                     // Reset the button
                     $button.prop('disabled', false).removeClass('wpgl-importing');
-                    $button.html('<?php _e("Import", "wp-gallery-link"); ?>');
+                    $button.html('Import');
                 }
             },
             error: function(xhr, status, error) {
+                addLogMessage('AJAX error importing album: ' + error);
                 showError(wpgl_vars.i18n.import_error + ' ' + error);
                 
                 // Reset the button
                 $button.prop('disabled', false).removeClass('wpgl-importing');
-                $button.html('<?php _e("Import", "wp-gallery-link"); ?>');
+                $button.html('Import');
             }
         });
     }
@@ -257,6 +398,8 @@
         if (typeof wp !== 'undefined' && wp.notices && wp.notices.render) {
             wp.notices.render();
         }
+        
+        addLogMessage('ERROR: ' + message);
     }
     
     // Initialize on DOM ready
