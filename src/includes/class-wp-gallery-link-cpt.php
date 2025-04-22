@@ -1,4 +1,3 @@
-
 <?php
 /**
  * Custom Post Type for Google Photo Albums
@@ -303,5 +302,85 @@ class WP_Gallery_Link_CPT {
                 echo $custom_order !== '' ? intval($custom_order) : '—';
                 break;
         }
+    }
+    
+    /**
+     * Create a new album from Google Photos data
+     * 
+     * @param array $album_data Album data from Google Photos API
+     * @return int|WP_Error The post ID on success, WP_Error on failure
+     */
+    public function create_album_from_google($album_data) {
+        if (empty($album_data['id']) || empty($album_data['title'])) {
+            return new WP_Error('invalid_album_data', __('Invalid album data provided', 'wp-gallery-link'));
+        }
+        
+        // Check if an album with this ID already exists
+        $existing_albums = get_posts(array(
+            'post_type' => 'gphoto_album',
+            'meta_key' => '_gphoto_album_id',
+            'meta_value' => $album_data['id'],
+            'posts_per_page' => 1,
+        ));
+        
+        if (!empty($existing_albums)) {
+            return new WP_Error('album_exists', __('Album already exists', 'wp-gallery-link'), array('post_id' => $existing_albums[0]->ID));
+        }
+        
+        // Create post object
+        $post_args = array(
+            'post_title'   => $album_data['title'],
+            'post_content' => isset($album_data['description']) ? $album_data['description'] : '',
+            'post_status'  => 'publish',
+            'post_type'    => 'gphoto_album',
+        );
+        
+        // Insert the post into the database
+        $post_id = wp_insert_post($post_args);
+        
+        if (is_wp_error($post_id)) {
+            return $post_id;
+        }
+        
+        // Save album metadata
+        update_post_meta($post_id, '_gphoto_album_id', sanitize_text_field($album_data['id']));
+        
+        // If album has a URL
+        if (!empty($album_data['productUrl'])) {
+            update_post_meta($post_id, '_gphoto_album_url', esc_url_raw($album_data['productUrl']));
+        }
+        
+        // If album has a creation date
+        if (!empty($album_data['creationTime'])) {
+            $date = date('Y-m-d', strtotime($album_data['creationTime']));
+            update_post_meta($post_id, '_gphoto_album_date', $date);
+        }
+        
+        // If album has a photo count
+        if (isset($album_data['mediaItemsCount'])) {
+            update_post_meta($post_id, '_gphoto_photo_count', intval($album_data['mediaItemsCount']));
+        }
+        
+        // If album has a cover photo, set as featured image
+        if (!empty($album_data['coverPhotoBaseUrl']) && function_exists('media_sideload_image')) {
+            $cover_url = $album_data['coverPhotoBaseUrl'] . '=w800-h800';
+            $tmp = download_url($cover_url);
+            
+            if (!is_wp_error($tmp)) {
+                $file_array = array(
+                    'name' => sanitize_title($album_data['title']) . '-cover.jpg',
+                    'tmp_name' => $tmp
+                );
+                
+                // Use media_handle_sideload to add it to the media library and attach it to the post
+                $thumbnail_id = media_handle_sideload($file_array, $post_id);
+                
+                if (!is_wp_error($thumbnail_id)) {
+                    set_post_thumbnail($post_id, $thumbnail_id);
+                }
+            }
+        }
+        
+        return $post_id;
     }
 }

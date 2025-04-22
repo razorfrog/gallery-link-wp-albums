@@ -1,4 +1,3 @@
-
 jQuery(document).ready(function($) {
     'use strict';
     
@@ -66,11 +65,33 @@ jQuery(document).ready(function($) {
      * Render an album in the grid
      */
     function renderAlbum(album) {
-        const template = wp.template('wpgl-album');
+        // Fix: Don't use wp.template which is causing the raw template code to appear
+        // Instead, render the album HTML directly
         const $albumsGrid = $('.wpgl-albums-grid');
         
-        if ($albumsGrid.length && template) {
-            $albumsGrid.append(template(album));
+        if ($albumsGrid.length) {
+            const coverImage = album.coverPhotoBaseUrl 
+                ? `<img src="${album.coverPhotoBaseUrl}=w200-h200" alt="${album.title}" class="wpgl-album-cover">` 
+                : `<div class="wpgl-no-cover">No Cover Image</div>`;
+                
+            const albumHtml = `
+                <div class="wpgl-album" data-id="${album.id}">
+                    <div class="wpgl-album-cover-container">
+                        ${coverImage}
+                    </div>
+                    <div class="wpgl-album-info">
+                        <h3 class="wpgl-album-title">${album.title}</h3>
+                        <div class="wpgl-album-meta">
+                            ${album.mediaItemsCount ? `<span class="wpgl-album-count">${album.mediaItemsCount} photos</span>` : ''}
+                        </div>
+                        <div class="wpgl-album-actions">
+                            <button class="button button-primary wpgl-import-album" data-id="${album.id}">Import</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            $albumsGrid.append(albumHtml);
         }
     }
     
@@ -259,9 +280,27 @@ jQuery(document).ready(function($) {
                 logDebug('Album import response:', response);
                 
                 if (response.success) {
+                    // Success UI updates - show message and button changes
                     $button.removeClass('button-primary')
                           .addClass('button-secondary')
                           .text(wpglAdmin.i18n.imported);
+                    
+                    // Show the album ID and info in the console for debugging
+                    console.log('Successfully imported album:', albumId, response);
+                    
+                    // Redirect to the edit page for the newly created album post
+                    if (response.data && response.data.post_id) {
+                        // Add a short delay before redirect to show the success message
+                        setTimeout(function() {
+                            window.location.href = response.data.edit_url || 
+                                `post.php?post=${response.data.post_id}&action=edit`;
+                        }, 1000);
+                    } else {
+                        // If no post ID in response, refresh the album list page
+                        setTimeout(function() {
+                            window.location.href = 'edit.php?post_type=gphoto_album';
+                        }, 1000);
+                    }
                     
                     // Show success message
                     alert(wpglAdmin.i18n.import_success);

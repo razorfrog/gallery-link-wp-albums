@@ -91,6 +91,9 @@ class WP_Gallery_Link {
         
         // Initialize plugin
         add_action('plugins_loaded', array($this, 'init'));
+        
+        // Register AJAX handlers
+        add_action('wp_ajax_wpgl_import_album', array($this, 'ajax_import_album'));
     }
 
     /**
@@ -115,6 +118,60 @@ class WP_Gallery_Link {
      */
     public function deactivate() {
         flush_rewrite_rules();
+    }
+    
+    /**
+     * Handle album import via AJAX
+     */
+    public function ajax_import_album() {
+        // Check nonce
+        if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'wpgl_nonce')) {
+            wp_send_json_error(array('message' => __('Security check failed', 'wp-gallery-link')));
+            return;
+        }
+        
+        // Check for album ID
+        if (empty($_POST['album_id'])) {
+            wp_send_json_error(array('message' => __('No album ID provided', 'wp-gallery-link')));
+            return;
+        }
+        
+        $album_id = sanitize_text_field($_POST['album_id']);
+        
+        // Get album details from Google Photos
+        $album_data = $this->google_api->get_album($album_id);
+        
+        if (is_wp_error($album_data)) {
+            wp_send_json_error(array('message' => $album_data->get_error_message()));
+            return;
+        }
+        
+        // Create album post
+        $post_id = $this->cpt->create_album_from_google($album_data);
+        
+        if (is_wp_error($post_id)) {
+            if ($post_id->get_error_code() === 'album_exists') {
+                $error_data = $post_id->get_error_data();
+                $edit_url = get_edit_post_link($error_data['post_id'], '');
+                wp_send_json_success(array(
+                    'message' => __('Album already exists', 'wp-gallery-link'),
+                    'post_id' => $error_data['post_id'],
+                    'edit_url' => $edit_url,
+                    'view_url' => get_permalink($error_data['post_id']),
+                ));
+            } else {
+                wp_send_json_error(array('message' => $post_id->get_error_message()));
+            }
+            return;
+        }
+        
+        // Success response
+        wp_send_json_success(array(
+            'message' => __('Album imported successfully', 'wp-gallery-link'),
+            'post_id' => $post_id,
+            'edit_url' => get_edit_post_link($post_id, ''),
+            'view_url' => get_permalink($post_id),
+        ));
     }
 }
 
