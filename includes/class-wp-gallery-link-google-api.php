@@ -1,3 +1,4 @@
+
 <?php
 /**
  * Google Photos API Integration
@@ -90,6 +91,17 @@ class WP_Gallery_Link_Google_API {
         $authorized = !empty($this->access_token);
         $this->log('Authorization check: ' . ($authorized ? 'Authorized' : 'Not authorized'));
         return $authorized;
+    }
+    
+    /**
+     * Check if API is connected with credentials
+     * 
+     * @return bool True if credentials are configured, false otherwise
+     */
+    public function is_connected() {
+        $has_credentials = !empty($this->credentials['client_id']) && !empty($this->credentials['client_secret']);
+        $this->log('Connection check: ' . ($has_credentials ? 'Connected' : 'Not connected'));
+        return $has_credentials;
     }
     
     /**

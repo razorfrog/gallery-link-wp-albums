@@ -1,3 +1,4 @@
+
 <?php
 /**
  * Admin functionality
@@ -20,6 +21,10 @@ class WP_Gallery_Link_Admin {
         
         // Add debug actions
         add_action('wp_ajax_wpgl_clear_debug_log', array($this, 'ajax_clear_debug_log'));
+        
+        // Add API test action
+        add_action('wp_ajax_wpgl_test_api', array($this, 'ajax_test_api'));
+        add_action('wp_ajax_wpgl_refresh_token', array($this, 'ajax_refresh_token'));
     }
     
     /**
@@ -412,6 +417,9 @@ class WP_Gallery_Link_Admin {
                     <button class="button button-primary wpgl-load-albums">
                         <?php _e('Load Albums', 'wp-gallery-link'); ?>
                     </button>
+                    <button class="button wpgl-load-demo-albums">
+                        <?php _e('Load Demo Albums', 'wp-gallery-link'); ?>
+                    </button>
                 </div>
                 
                 <!-- Album template -->
@@ -438,9 +446,15 @@ class WP_Gallery_Link_Admin {
                             </div>
                             
                             <div class="wpgl-album-actions">
-                                <button class="button wpgl-import-album" data-id="{{ data.id }}">
-                                    <?php _e('Import', 'wp-gallery-link'); ?>
-                                </button>
+                                <# if (data.imported) { #>
+                                    <span class="wpgl-imported-label"><?php _e('Imported', 'wp-gallery-link'); ?></span>
+                                    <a href="{{ data.editLink }}" class="button button-small" target="_blank"><?php _e('Edit', 'wp-gallery-link'); ?></a>
+                                    <a href="{{ data.viewLink }}" class="button button-small" target="_blank"><?php _e('View', 'wp-gallery-link'); ?></a>
+                                <# } else { #>
+                                    <button class="button wpgl-import-album" data-id="{{ data.id }}">
+                                        <?php _e('Import', 'wp-gallery-link'); ?>
+                                    </button>
+                                <# } #>
                             </div>
                         </div>
                     </div>
@@ -978,5 +992,71 @@ class WP_Gallery_Link_Admin {
         $log = $google_api->get_debug_log();
         
         wp_send_json_success(array('log' => $log));
+    }
+    
+    /**
+     * AJAX handler for testing API connection
+     */
+    public function ajax_test_api() {
+        // Check nonce for security
+        if (!check_ajax_referer('wpgl_debug', 'nonce', false)) {
+            wp_send_json_error(array('message' => __('Security check failed', 'wp-gallery-link')));
+        }
+        
+        // Check user capabilities
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(array('message' => __('Insufficient permissions', 'wp-gallery-link')));
+        }
+        
+        // Test API connection
+        $google_api = wp_gallery_link()->google_api;
+        
+        if (!$google_api->is_connected()) {
+            wp_send_json_error(array('message' => __('API credentials not configured', 'wp-gallery-link')));
+            return;
+        }
+        
+        if (!$google_api->is_authorized()) {
+            wp_send_json_error(array('message' => __('Not authorized with Google Photos', 'wp-gallery-link')));
+            return;
+        }
+        
+        // Try to fetch albums as a connection test
+        $result = $google_api->fetch_albums();
+        
+        if (is_wp_error($result)) {
+            wp_send_json_error(array('message' => $result->get_error_message()));
+            return;
+        }
+        
+        wp_send_json_success(array(
+            'message' => __('API connection successful', 'wp-gallery-link'),
+            'albums_count' => count($result)
+        ));
+    }
+    
+    /**
+     * AJAX handler for refreshing access token
+     */
+    public function ajax_refresh_token() {
+        // Check nonce for security
+        if (!check_ajax_referer('wpgl_debug', 'nonce', false)) {
+            wp_send_json_error(array('message' => __('Security check failed', 'wp-gallery-link')));
+        }
+        
+        // Check user capabilities
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(array('message' => __('Insufficient permissions', 'wp-gallery-link')));
+        }
+        
+        // Refresh token
+        $google_api = wp_gallery_link()->google_api;
+        $result = $google_api->refresh_access_token();
+        
+        if ($result) {
+            wp_send_json_success(array('message' => __('Token refreshed successfully', 'wp-gallery-link')));
+        } else {
+            wp_send_json_error(array('message' => __('Failed to refresh token', 'wp-gallery-link')));
+        }
     }
 }
