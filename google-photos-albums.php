@@ -20,10 +20,37 @@ define('WP_GALLERY_LINK_VERSION', '1.0.0');
 define('WP_GALLERY_LINK_PATH', plugin_dir_path(__FILE__));
 define('WP_GALLERY_LINK_URL', plugin_dir_url(__FILE__));
 define('WP_GALLERY_LINK_DEBUG', true);
+define('WP_GALLERY_LINK_TEMPLATE_PATH', WP_GALLERY_LINK_PATH . 'templates/');
 
 // Log plugin initialization for debugging
 if (WP_GALLERY_LINK_DEBUG) {
     error_log('Google Photos Albums plugin initialized with path: ' . WP_GALLERY_LINK_PATH);
+    error_log('Template path set to: ' . WP_GALLERY_LINK_TEMPLATE_PATH);
+}
+
+// Create templates directory if it doesn't exist
+if (!file_exists(WP_GALLERY_LINK_TEMPLATE_PATH)) {
+    mkdir(WP_GALLERY_LINK_TEMPLATE_PATH, 0755, true);
+    error_log('Created template directory at: ' . WP_GALLERY_LINK_TEMPLATE_PATH);
+    
+    // Create a basic album template as a fallback
+    $basic_template = '<div class="wpgl-album" data-id="{{id}}">
+    <div class="wpgl-album-cover-container">
+        <img src="{{cover}}" alt="{{title}}" class="wpgl-album-cover">
+    </div>
+    <div class="wpgl-album-info">
+        <h3 class="wpgl-album-title">{{title}}</h3>
+        <div class="wpgl-album-meta">
+            <span class="wpgl-album-count">{{count}} photos</span>
+        </div>
+        <div class="wpgl-album-actions">
+            <button class="button button-primary wpgl-import-album" data-id="{{id}}">Import</button>
+        </div>
+    </div>
+</div>';
+    
+    file_put_contents(WP_GALLERY_LINK_TEMPLATE_PATH . 'wpgl-album.php', $basic_template);
+    error_log('Created basic album template fallback');
 }
 
 // Include the necessary files - search in multiple locations to support different folder structures
@@ -81,6 +108,43 @@ wpgl_include_file('wp-gallery-link.php', $include_paths);
 // Include the admin and shortcode class files
 wpgl_include_file('class-wp-gallery-link-admin.php', $include_paths);
 wpgl_include_file('class-wp-gallery-link-shortcode.php', $include_paths);
+
+// Register a function to handle template loading
+function wpgl_get_template($template_name, $data = array()) {
+    // Define possible template paths
+    $template_paths = array(
+        WP_GALLERY_LINK_PATH . 'templates/' . $template_name . '.php',
+        WP_GALLERY_LINK_PATH . 'templates/' . $template_name . '.html',
+        WP_GALLERY_LINK_PATH . $template_name . '.php',
+        WP_GALLERY_LINK_PATH . $template_name . '.html',
+        get_stylesheet_directory() . '/wpgl-templates/' . $template_name . '.php',
+        get_stylesheet_directory() . '/wpgl-templates/' . $template_name . '.html',
+    );
+    
+    error_log('Attempting to load template: ' . $template_name);
+    
+    // Try to find the template
+    $template_file = false;
+    foreach ($template_paths as $path) {
+        error_log('Checking template path: ' . $path);
+        if (file_exists($path)) {
+            $template_file = $path;
+            error_log('Template found at: ' . $path);
+            break;
+        }
+    }
+    
+    // If template is found, load it
+    if ($template_file) {
+        ob_start();
+        extract($data);
+        include $template_file;
+        return ob_get_clean();
+    }
+    
+    error_log('Template not found: ' . $template_name . ' - Using direct HTML rendering instead');
+    return false;
+}
 
 // Create a function that initializes the plugin admin interface
 function wpgl_init_admin() {
@@ -143,6 +207,52 @@ function wpgl_ajax_import_album_wrapper() {
     } else {
         wp_send_json_error(array('message' => 'Method ajax_import_album not found in main plugin class'));
     }
+}
+
+// Register REST API endpoint for template debugging
+add_action('rest_api_init', function() {
+    register_rest_route('wpgl/v1', '/check-templates', array(
+        'methods' => 'GET',
+        'callback' => 'wpgl_check_templates_callback',
+        'permission_callback' => function() {
+            return current_user_can('manage_options');
+        }
+    ));
+});
+
+function wpgl_check_templates_callback($request) {
+    $templates_to_check = array('wpgl-album', 'wpgl-albums-grid');
+    $results = array();
+    
+    foreach ($templates_to_check as $template) {
+        $template_paths = array(
+            WP_GALLERY_LINK_PATH . 'templates/' . $template . '.php',
+            WP_GALLERY_LINK_PATH . 'templates/' . $template . '.html',
+            WP_GALLERY_LINK_PATH . $template . '.php',
+            WP_GALLERY_LINK_PATH . $template . '.html',
+            get_stylesheet_directory() . '/wpgl-templates/' . $template . '.php',
+            get_stylesheet_directory() . '/wpgl-templates/' . $template . '.html',
+        );
+        
+        $found = false;
+        $found_path = '';
+        
+        foreach ($template_paths as $path) {
+            if (file_exists($path)) {
+                $found = true;
+                $found_path = $path;
+                break;
+            }
+        }
+        
+        $results[$template] = array(
+            'found' => $found,
+            'path' => $found ? $found_path : 'Not found',
+            'paths_checked' => $template_paths
+        );
+    }
+    
+    return new WP_REST_Response($results, 200);
 }
 
 // Log plugin initialization completion

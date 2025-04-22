@@ -1,3 +1,4 @@
+
 jQuery(document).ready(function($) {
     'use strict';
     
@@ -28,6 +29,7 @@ jQuery(document).ready(function($) {
     logDebug('Admin script initialized');
     console.log('WP Gallery Link admin.js loaded successfully');
     console.log('Checking for wpglAdmin object:', typeof wpglAdmin !== 'undefined' ? 'Available' : 'Not available');
+    console.log('IMPORTANT: This version uses direct HTML rendering only - no templates');
     
     /**
      * Add a message to the loading log
@@ -67,10 +69,10 @@ jQuery(document).ready(function($) {
     }
     
     /**
-     * Render an album in the grid - Using direct HTML creation to avoid template issues
+     * Render an album in the grid - Using direct HTML creation ONLY
      */
     function renderAlbum(album) {
-        logDebug('Rendering album:', album);
+        logDebug('Rendering album using direct HTML creation:', album);
         console.log('Rendering album with ID:', album.id, 'and title:', album.title);
 
         const $albumsGrid = $('.wpgl-albums-grid');
@@ -84,7 +86,7 @@ jQuery(document).ready(function($) {
         // Create a default cover image if one isn't provided
         const coverImageUrl = album.coverPhotoBaseUrl || 'https://via.placeholder.com/200x200?text=No+Cover';
         
-        // Create album HTML directly in JavaScript
+        // Create album HTML directly in JavaScript - NO TEMPLATES
         const albumHtml = `
             <div class="wpgl-album" data-id="${album.id}">
                 <div class="wpgl-album-cover-container">
@@ -148,7 +150,7 @@ jQuery(document).ready(function($) {
      */
     function loadAlbums() {
         logDebug('loadAlbums function called');
-        console.log('WP Gallery Link: loadAlbums function called');
+        console.log('WP Gallery Link: loadAlbums function called - DIRECT HTML RENDERING VERSION');
         
         if (cancelLoading) {
             addLoadingLog('Album loading canceled by user.');
@@ -175,7 +177,7 @@ jQuery(document).ready(function($) {
             data.pageToken = nextPageToken;
         }
         
-        addLoadingLog('Fetching albums from Google Photos API...');
+        addLoadingLog('Fetching albums from Google Photos API using direct HTML rendering...');
         updateLoadingStatus('Fetching albums...');
         updateProgress(10);
         
@@ -214,7 +216,7 @@ jQuery(document).ready(function($) {
                     // Show the albums container
                     $('.wpgl-albums-container').show();
                     
-                    // Render each album directly without using templates
+                    // Render each album directly with HTML generation
                     albums.forEach(function(album) {
                         albumsFound.push(album);
                         addAlbumToList(album.title);
