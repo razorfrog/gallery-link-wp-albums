@@ -1,20 +1,82 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
+import { AlbumCard } from "@/components/AlbumCard";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+import { InfoIcon } from "lucide-react";
+
+type Album = {
+  id: number;
+  title: string;
+  photoCount: number;
+  coverImage: string;
+  date: string;
+};
+
+type LoadingLog = {
+  id: number;
+  message: string;
+  timestamp: string;
+};
 
 const Index = () => {
   const [isLoading, setIsLoading] = useState(false);
-  const [albums, setAlbums] = useState([]);
+  const [albums, setAlbums] = useState<Album[]>([]);
+  const [progress, setProgress] = useState(0);
+  const [logs, setLogs] = useState<LoadingLog[]>([]);
   const { toast } = useToast();
+  
+  const addLog = (message: string) => {
+    setLogs(currentLogs => [
+      ...currentLogs, 
+      { 
+        id: Date.now(), 
+        message, 
+        timestamp: new Date().toLocaleTimeString() 
+      }
+    ]);
+  };
   
   // Mock function to simulate loading albums
   const handleLoadAlbums = () => {
     setIsLoading(true);
-    // Simulate API call
+    setProgress(0);
+    setLogs([]);
+    
+    addLog("Starting to load albums...");
+    
+    // Simulate API call with progress updates
+    const progressInterval = setInterval(() => {
+      setProgress(prevProgress => {
+        const newProgress = prevProgress + 5;
+        
+        if (newProgress === 25) {
+          addLog("Authenticating with Google Photos API...");
+        }
+        
+        if (newProgress === 50) {
+          addLog("Fetching album list from Google...");
+        }
+        
+        if (newProgress === 75) {
+          addLog("Processing album data...");
+        }
+        
+        if (newProgress >= 100) {
+          clearInterval(progressInterval);
+          return 100;
+        }
+        
+        return newProgress;
+      });
+    }, 125);
+    
+    // Simulate API response
     setTimeout(() => {
+      addLog("Albums loaded successfully!");
       setAlbums([
         {
           id: 1,
@@ -43,8 +105,16 @@ const Index = () => {
         title: "Albums Loaded",
         description: "Successfully loaded 3 albums",
       });
-    }, 1500);
+    }, 3000);
   };
+
+  useEffect(() => {
+    // Clean up interval on component unmount
+    return () => {
+      setProgress(0);
+      setLogs([]);
+    };
+  }, []);
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-100 p-4">
@@ -102,40 +172,58 @@ const Index = () => {
           </Button>
         </div>
         
-        {isLoading ? (
-          <div className="space-y-4">
-            <p>Loading albums...</p>
-            <Progress value={45} className="h-2" />
+        {isLoading && (
+          <div className="space-y-4 mb-6">
+            <div className="flex items-center justify-between mb-2">
+              <p>Loading albums...</p>
+              <span className="text-sm text-gray-500">{progress}%</span>
+            </div>
+            <Progress value={progress} className="h-2" />
+            
+            <Alert className="bg-blue-50 border-blue-200">
+              <InfoIcon className="h-4 w-4" />
+              <AlertTitle>Loading Status Log</AlertTitle>
+              <AlertDescription>
+                <div className="mt-2 max-h-40 overflow-y-auto border rounded-md p-2 bg-white">
+                  {logs.map((log) => (
+                    <div key={log.id} className="text-sm py-1 border-b border-gray-100 last:border-0">
+                      <span className="text-gray-500 mr-2">[{log.timestamp}]</span>
+                      {log.message}
+                    </div>
+                  ))}
+                </div>
+              </AlertDescription>
+            </Alert>
+            
             <div className="grid md:grid-cols-3 gap-4">
               {[1, 2, 3].map((i) => (
-                <div key={i} className="border rounded-md p-4">
-                  <Skeleton className="h-[200px] w-full mb-3" />
-                  <Skeleton className="h-6 w-3/4 mb-2" />
-                  <Skeleton className="h-5 w-1/2" />
-                </div>
+                <AlbumCard
+                  key={i}
+                  id={i}
+                  title=""
+                  photoCount={0}
+                  coverImage=""
+                  date=""
+                  isLoading={true}
+                />
               ))}
             </div>
           </div>
-        ) : (
+        )}
+        
+        {!isLoading && (
           <div className="grid md:grid-cols-3 gap-4">
             {albums.length > 0 ? (
               albums.map(album => (
-                <div key={album.id} className="border rounded-md overflow-hidden">
-                  <div className="h-[200px] bg-gray-100 relative">
-                    <img 
-                      src={album.coverImage} 
-                      alt={album.title} 
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                  <div className="p-4">
-                    <h3 className="text-lg font-semibold">{album.title}</h3>
-                    <div className="text-sm text-gray-600 flex justify-between mt-1">
-                      <span>{album.photoCount} photos</span>
-                      <span>{album.date}</span>
-                    </div>
-                  </div>
-                </div>
+                <AlbumCard
+                  key={album.id}
+                  id={album.id}
+                  title={album.title}
+                  photoCount={album.photoCount}
+                  coverImage={album.coverImage}
+                  date={album.date}
+                  isLoading={false}
+                />
               ))
             ) : (
               <div className="col-span-3 py-8 text-center">
