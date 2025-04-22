@@ -212,14 +212,6 @@ jQuery(document).ready(function($) {
         
         // Find album data
         var title = $albumElement.find('.wpgl-album-title').text();
-        var albumData = {
-            id: albumId,
-            title: title,
-            coverPhotoBaseUrl: $albumElement.find('.wpgl-album-thumbnail img').attr('src'),
-            mediaItemsCount: $albumElement.find('.wpgl-album-count').text().split(' ')[0]
-        };
-        
-        console.log('Album data:', albumData);
         
         // Make AJAX request to import
         $.ajax({
@@ -227,8 +219,8 @@ jQuery(document).ready(function($) {
             method: 'POST',
             data: {
                 action: 'wpgl_import_album',
-                nonce: wpglAdmin.importNonce,
-                album: albumData
+                nonce: wpglAdmin.nonce,
+                album_id: albumId
             },
             success: function(response) {
                 console.log('Import response:', response);
@@ -238,7 +230,7 @@ jQuery(document).ready(function($) {
                            .removeClass('button-primary')
                            .addClass('button-disabled');
                     
-                    if (response.data.edit_url) {
+                    if (response.data && response.data.edit_url) {
                         var $editLink = $('<a href="' + response.data.edit_url + '" class="button button-small">Edit</a>');
                         $button.after(' ').after($editLink);
                     }
@@ -264,48 +256,9 @@ jQuery(document).ready(function($) {
     if (window.location.href.indexOf('page=wp-gallery-link-import') > -1) {
         console.log('On import page, auto-loading albums');
         setTimeout(function() {
-            // Create demo albums if they don't exist
-            if ($albumsGrid.find('.wpgl-album').length === 0) {
-                console.log('No existing albums found, preparing demo albums');
-                var demoAlbums = [
-                    {
-                        id: 'demo1',
-                        title: 'Summer Vacation',
-                        coverPhotoBaseUrl: WP_GALLERY_LINK_URL + 'assets/images/default-album.png',
-                        mediaItemsCount: '42'
-                    },
-                    {
-                        id: 'demo2',
-                        title: 'Family Gathering',
-                        coverPhotoBaseUrl: WP_GALLERY_LINK_URL + 'assets/images/default-album.png',
-                        mediaItemsCount: '78'
-                    },
-                    {
-                        id: 'demo3',
-                        title: 'Nature Photography',
-                        coverPhotoBaseUrl: WP_GALLERY_LINK_URL + 'assets/images/default-album.png',
-                        mediaItemsCount: '53'
-                    }
-                ];
-                
-                console.log('Auto-clicking load button');
-                addLog('Auto-loading albums in demo mode');
-                $loadButton.trigger('click');
-                
-                // Simulate loading
-                var progress = 0;
-                var loadingInterval = setInterval(function() {
-                    progress += 10;
-                    updateProgress(progress, 'Loading albums... ' + progress + '%');
-                    
-                    if (progress >= 100) {
-                        clearInterval(loadingInterval);
-                        console.log('Demo albums:', demoAlbums);
-                        renderAlbums(demoAlbums);
-                        addLog('Demo albums loaded successfully');
-                    }
-                }, 300);
-            }
+            console.log('Auto-clicking load button');
+            addLog('Auto-loading albums');
+            $loadButton.trigger('click');
         }, 1000);
     }
 });

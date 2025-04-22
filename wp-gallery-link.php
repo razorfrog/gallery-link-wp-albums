@@ -129,6 +129,12 @@ class WP_Gallery_Link {
         }
         
         $this->log('Plugin initialized', 'info');
+        
+        // Initialize AJAX handlers
+        add_action('wp_ajax_wpgl_fetch_albums', array($this->google_api, 'ajax_fetch_albums'));
+        add_action('wp_ajax_wpgl_import_album', array($this->google_api, 'ajax_import_album'));
+        add_action('wp_ajax_wpgl_refresh_token', array($this->google_api, 'ajax_refresh_token'));
+        add_action('wp_ajax_wpgl_test_api', array($this->google_api, 'ajax_test_api'));
     }
     
     /**
@@ -262,11 +268,27 @@ class WP_Gallery_Link {
             },
             refreshAuth: function() {
                 console.log('Refreshing Google API authorization...');
-                // Add refresh code here
+                jQuery.post('<?php echo admin_url('admin-ajax.php'); ?>', {
+                    action: 'wpgl_refresh_token',
+                    nonce: '<?php echo wp_create_nonce('wpgl_debug'); ?>'
+                }, function(response) {
+                    console.log('Token refresh response:', response);
+                });
+            },
+            testApi: function() {
+                console.log('Testing API connection...');
+                jQuery.post('<?php echo admin_url('admin-ajax.php'); ?>', {
+                    action: 'wpgl_test_api',
+                    nonce: '<?php echo wp_create_nonce('wpgl_debug'); ?>'
+                }, function(response) {
+                    console.log('API test response:', response);
+                });
             }
         };
         
         console.log('Type wpGalleryLinkDebug.getLog() to view the debug log in console');
+        console.log('Type wpGalleryLinkDebug.refreshAuth() to refresh the auth token');
+        console.log('Type wpGalleryLinkDebug.testApi() to test the API connection');
         </script>
         <?php
     }

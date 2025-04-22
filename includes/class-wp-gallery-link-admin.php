@@ -1,7 +1,7 @@
 
 <?php
 /**
- * Admin functionality
+ * Admin settings and functionality
  */
 class WP_Gallery_Link_Admin {
     
@@ -10,21 +10,8 @@ class WP_Gallery_Link_Admin {
      */
     public function __construct() {
         add_action('admin_menu', array($this, 'add_admin_menu'));
-        add_action('admin_enqueue_scripts', array($this, 'enqueue_admin_scripts'));
+        add_action('admin_enqueue_scripts', array($this, 'enqueue_scripts'));
         add_action('admin_init', array($this, 'register_settings'));
-        
-        // Handle authorization callback
-        add_action('admin_init', array($this, 'handle_auth_callback'));
-        
-        // AJAX import album action
-        add_action('wp_ajax_wpgl_import_album', array($this, 'ajax_import_album'));
-        
-        // Add debug actions
-        add_action('wp_ajax_wpgl_clear_debug_log', array($this, 'ajax_clear_debug_log'));
-        
-        // Add API test action
-        add_action('wp_ajax_wpgl_test_api', array($this, 'ajax_test_api'));
-        add_action('wp_ajax_wpgl_refresh_token', array($this, 'ajax_refresh_token'));
     }
     
     /**
@@ -33,21 +20,21 @@ class WP_Gallery_Link_Admin {
     public function add_admin_menu() {
         add_menu_page(
             __('WP Gallery Link', 'wp-gallery-link'),
-            __('Gallery Link', 'wp-gallery-link'),
+            __('WP Gallery Link', 'wp-gallery-link'),
             'manage_options',
             'wp-gallery-link',
-            array($this, 'render_main_page'),
+            array($this, 'render_settings_page'),
             'dashicons-format-gallery',
             30
         );
         
         add_submenu_page(
             'wp-gallery-link',
-            __('Dashboard', 'wp-gallery-link'),
-            __('Dashboard', 'wp-gallery-link'),
+            __('Settings', 'wp-gallery-link'),
+            __('Settings', 'wp-gallery-link'),
             'manage_options',
             'wp-gallery-link',
-            array($this, 'render_main_page')
+            array($this, 'render_settings_page')
         );
         
         add_submenu_page(
@@ -58,43 +45,13 @@ class WP_Gallery_Link_Admin {
             'wp-gallery-link-import',
             array($this, 'render_import_page')
         );
-        
-        add_submenu_page(
-            'wp-gallery-link',
-            __('Settings', 'wp-gallery-link'),
-            __('Settings', 'wp-gallery-link'),
-            'manage_options',
-            'wp-gallery-link-settings',
-            array($this, 'render_settings_page')
-        );
-        
-        // Hidden page for auth callback
-        add_submenu_page(
-            null,
-            __('Google Authorization', 'wp-gallery-link'),
-            __('Google Authorization', 'wp-gallery-link'),
-            'manage_options',
-            'wp-gallery-link-auth',
-            array($this, 'render_auth_callback_page')
-        );
-        
-        // Add debug page
-        add_submenu_page(
-            'wp-gallery-link',
-            __('Debug Log', 'wp-gallery-link'),
-            __('Debug Log', 'wp-gallery-link'),
-            'manage_options',
-            'wp-gallery-link-debug',
-            array($this, 'render_debug_page')
-        );
     }
     
     /**
      * Enqueue admin scripts and styles
      */
-    public function enqueue_admin_scripts($hook) {
-        // Only load on our plugin pages
-        if (strpos($hook, 'wp-gallery-link') === false) {
+    public function enqueue_scripts($hook) {
+        if (!in_array($hook, array('toplevel_page_wp-gallery-link', 'wp-gallery-link_page_wp-gallery-link-import', 'wp-gallery-link_page_wp-gallery-link-debug'))) {
             return;
         }
         
@@ -115,253 +72,185 @@ class WP_Gallery_Link_Admin {
         
         wp_localize_script('wp-gallery-link-admin', 'wpglAdmin', array(
             'ajaxUrl' => admin_url('admin-ajax.php'),
-            'nonce' => wp_create_nonce('wpgl_fetch_albums'),
-            'importNonce' => wp_create_nonce('wpgl_import_album'),
-            'debugNonce' => wp_create_nonce('wpgl_debug'),
+            'nonce' => wp_create_nonce('wpgl_debug'),
             'i18n' => array(
-                'loading' => __('Loading albums...', 'wp-gallery-link'),
-                'error' => __('Error:', 'wp-gallery-link'),
-                'noAlbums' => __('No albums found.', 'wp-gallery-link'),
-                'import' => __('Import', 'wp-gallery-link'),
                 'importing' => __('Importing...', 'wp-gallery-link'),
                 'imported' => __('Imported', 'wp-gallery-link'),
-                'photos' => __('photos', 'wp-gallery-link')
+                'import' => __('Import', 'wp-gallery-link'),
+                'import_success' => __('Album imported successfully!', 'wp-gallery-link'),
+                'import_error' => __('Error importing album:', 'wp-gallery-link'),
+                'loading' => __('Loading albums...', 'wp-gallery-link'),
+                'load_more' => __('Load more', 'wp-gallery-link'),
+                'noAlbums' => __('No albums found.', 'wp-gallery-link'),
+                'error' => __('Error:', 'wp-gallery-link')
             )
         ));
     }
     
     /**
-     * Register settings
+     * Register plugin settings
      */
     public function register_settings() {
         register_setting('wpgl_settings', 'wpgl_google_client_id');
         register_setting('wpgl_settings', 'wpgl_google_client_secret');
-        register_setting('wpgl_settings', 'wpgl_shortcode_columns', array(
-            'default' => 3,
-            'sanitize_callback' => 'absint'
-        ));
         
-        // Add debug option
-        register_setting('wpgl_settings', 'wpgl_enable_debug', array(
-            'default' => true,
-            'sanitize_callback' => 'rest_sanitize_boolean'
-        ));
+        add_settings_section(
+            'wpgl_settings_section',
+            __('Google API Settings', 'wp-gallery-link'),
+            array($this, 'settings_section_callback'),
+            'wpgl_settings'
+        );
+        
+        add_settings_field(
+            'wpgl_google_client_id',
+            __('Client ID', 'wp-gallery-link'),
+            array($this, 'client_id_callback'),
+            'wpgl_settings',
+            'wpgl_settings_section'
+        );
+        
+        add_settings_field(
+            'wpgl_google_client_secret',
+            __('Client Secret', 'wp-gallery-link'),
+            array($this, 'client_secret_callback'),
+            'wpgl_settings',
+            'wpgl_settings_section'
+        );
     }
     
     /**
-     * Render main dashboard page
+     * Settings section callback
      */
-    public function render_main_page() {
-        // Get album stats
-        $album_count = wp_count_posts('gphoto_album');
-        $published_albums = $album_count->publish ?? 0;
+    public function settings_section_callback() {
+        echo '<p>' . __('To use WP Gallery Link, you need to create a project in the Google Cloud Console and enable the Google Photos Library API.', 'wp-gallery-link') . '</p>';
+        echo '<ol>';
+        echo '<li>' . __('Go to the <a href="https://console.cloud.google.com/apis/dashboard" target="_blank">Google Cloud Console</a>.', 'wp-gallery-link') . '</li>';
+        echo '<li>' . __('Create a new project or select an existing one.', 'wp-gallery-link') . '</li>';
+        echo '<li>' . __('Enable the "Google Photos Library API".', 'wp-gallery-link') . '</li>';
+        echo '<li>' . __('Go to "Credentials" and create an OAuth client ID.', 'wp-gallery-link') . '</li>';
+        echo '<li>' . __('Set the application type to "Web application".', 'wp-gallery-link') . '</li>';
+        echo '<li>' . __('Add the following authorized redirect URI:', 'wp-gallery-link') . '<br><code>' . admin_url('admin-ajax.php') . '?action=wpgl_auth_google</code></li>';
+        echo '<li>' . __('Copy the Client ID and Client Secret and paste them below.', 'wp-gallery-link') . '</li>';
+        echo '</ol>';
+    }
+    
+    /**
+     * Client ID field callback
+     */
+    public function client_id_callback() {
+        $client_id = get_option('wpgl_google_client_id', '');
+        echo '<input type="text" id="wpgl_google_client_id" name="wpgl_google_client_id" value="' . esc_attr($client_id) . '" class="regular-text">';
+    }
+    
+    /**
+     * Client Secret field callback
+     */
+    public function client_secret_callback() {
+        $client_secret = get_option('wpgl_google_client_secret', '');
+        echo '<input type="password" id="wpgl_google_client_secret" name="wpgl_google_client_secret" value="' . esc_attr($client_secret) . '" class="regular-text">';
+    }
+    
+    /**
+     * Render settings page
+     */
+    public function render_settings_page() {
+        if (!current_user_can('manage_options')) {
+            return;
+        }
         
-        // Get categories
-        $categories = get_terms(array(
-            'taxonomy' => 'album_category',
-            'hide_empty' => false
-        ));
-        $category_count = is_wp_error($categories) ? 0 : count($categories);
-        
-        // Check authorization status
         $google_api = wp_gallery_link()->google_api;
-        $is_authorized = $google_api->is_authorized();
-        $client_id = get_option('wpgl_google_client_id');
-        $client_secret = get_option('wpgl_google_client_secret');
-        $has_credentials = !empty($client_id) && !empty($client_secret);
-        
         ?>
-        <div class="wrap wpgl-admin">
-            <h1><?php _e('WP Gallery Link Dashboard', 'wp-gallery-link'); ?></h1>
+        <div class="wrap">
+            <h1><?php echo esc_html(get_admin_page_title()); ?></h1>
             
-            <div class="wpgl-dashboard-grid">
-                <div class="wpgl-dashboard-card">
-                    <div class="wpgl-card-header">
-                        <h2><?php _e('Overview', 'wp-gallery-link'); ?></h2>
-                    </div>
-                    <div class="wpgl-card-content">
-                        <div class="wpgl-stat-item">
-                            <span class="wpgl-stat-value"><?php echo intval($published_albums); ?></span>
-                            <span class="wpgl-stat-label"><?php _e('Published Albums', 'wp-gallery-link'); ?></span>
-                        </div>
-                        <div class="wpgl-stat-item">
-                            <span class="wpgl-stat-value"><?php echo intval($category_count); ?></span>
-                            <span class="wpgl-stat-label"><?php _e('Categories', 'wp-gallery-link'); ?></span>
-                        </div>
-                    </div>
-                    <div class="wpgl-card-footer">
-                        <a href="<?php echo admin_url('edit.php?post_type=gphoto_album'); ?>" class="button button-secondary">
-                            <?php _e('Manage Albums', 'wp-gallery-link'); ?>
-                        </a>
-                    </div>
+            <?php if (isset($_GET['error']) && $_GET['error'] === 'auth'): ?>
+                <div class="notice notice-error is-dismissible">
+                    <p><?php _e('Authentication failed. Please try again.', 'wp-gallery-link'); ?></p>
+                </div>
+            <?php elseif (isset($_GET['error']) && $_GET['error'] === 'token'): ?>
+                <div class="notice notice-error is-dismissible">
+                    <p><?php _e('Failed to retrieve access token. Please check your client ID and secret.', 'wp-gallery-link'); ?></p>
+                </div>
+            <?php elseif (isset($_GET['connected']) && $_GET['connected'] === '1'): ?>
+                <div class="notice notice-success is-dismissible">
+                    <p><?php _e('Successfully connected to Google Photos!', 'wp-gallery-link'); ?></p>
+                </div>
+            <?php endif; ?>
+            
+            <div class="wpgl-container">
+                <div class="wpgl-section">
+                    <h2><?php _e('API Settings', 'wp-gallery-link'); ?></h2>
+                    
+                    <form method="post" action="options.php">
+                        <?php
+                        settings_fields('wpgl_settings');
+                        do_settings_sections('wpgl_settings');
+                        submit_button();
+                        ?>
+                    </form>
                 </div>
                 
-                <div class="wpgl-dashboard-card">
-                    <div class="wpgl-card-header">
-                        <h2><?php _e('Google Photos Connection', 'wp-gallery-link'); ?></h2>
-                    </div>
-                    <div class="wpgl-card-content">
-                        <?php if (!$has_credentials): ?>
-                            <div class="wpgl-connection-status wpgl-status-warning">
-                                <span class="dashicons dashicons-warning"></span>
-                                <?php _e('API credentials not configured', 'wp-gallery-link'); ?>
-                            </div>
+                <div class="wpgl-section">
+                    <h2><?php _e('Google Photos Connection', 'wp-gallery-link'); ?></h2>
+                    
+                    <?php if ($google_api->is_connected()): ?>
+                        <p class="wpgl-connected">
+                            <span class="dashicons dashicons-yes-alt"></span>
+                            <?php _e('Connected to Google Photos', 'wp-gallery-link'); ?>
+                        </p>
+                        
+                        <p>
+                            <a href="<?php echo esc_url(admin_url('admin.php?page=wp-gallery-link-import')); ?>" class="button button-primary">
+                                <?php _e('Import Albums', 'wp-gallery-link'); ?>
+                            </a>
+                            
+                            <a href="<?php echo esc_url($google_api->get_auth_url()); ?>" class="button">
+                                <?php _e('Reconnect', 'wp-gallery-link'); ?>
+                            </a>
+                        </p>
+                    <?php else: ?>
+                        <p class="wpgl-not-connected">
+                            <span class="dashicons dashicons-no-alt"></span>
+                            <?php _e('Not connected to Google Photos', 'wp-gallery-link'); ?>
+                        </p>
+                        
+                        <?php if (!empty($google_api->get_auth_url())): ?>
                             <p>
-                                <?php _e('Please configure your Google API credentials in the settings page.', 'wp-gallery-link'); ?>
-                            </p>
-                        <?php elseif (!$is_authorized): ?>
-                            <div class="wpgl-connection-status wpgl-status-error">
-                                <span class="dashicons dashicons-no"></span>
-                                <?php _e('Not connected to Google Photos', 'wp-gallery-link'); ?>
-                            </div>
-                            <p>
-                                <?php _e('Please authorize the application to access your Google Photos.', 'wp-gallery-link'); ?>
-                            </p>
-                        <?php else: ?>
-                            <div class="wpgl-connection-status wpgl-status-success">
-                                <span class="dashicons dashicons-yes"></span>
-                                <?php _e('Connected to Google Photos', 'wp-gallery-link'); ?>
-                            </div>
-                            <p>
-                                <?php _e('Your site is authorized to access your Google Photos albums.', 'wp-gallery-link'); ?>
-                            </p>
-                        <?php endif; ?>
-                    </div>
-                    <div class="wpgl-card-footer">
-                        <?php if ($has_credentials): ?>
-                            <?php if ($is_authorized): ?>
-                                <a href="<?php echo admin_url('admin.php?page=wp-gallery-link-import'); ?>" class="button button-primary">
-                                    <?php _e('Import Albums', 'wp-gallery-link'); ?>
-                                </a>
-                            <?php else: ?>
                                 <a href="<?php echo esc_url($google_api->get_auth_url()); ?>" class="button button-primary">
                                     <?php _e('Connect to Google Photos', 'wp-gallery-link'); ?>
                                 </a>
-                            <?php endif; ?>
+                            </p>
                         <?php else: ?>
-                            <a href="<?php echo admin_url('admin.php?page=wp-gallery-link-settings'); ?>" class="button button-primary">
-                                <?php _e('Configure API Settings', 'wp-gallery-link'); ?>
-                            </a>
+                            <p>
+                                <?php _e('Please enter your Google API credentials first.', 'wp-gallery-link'); ?>
+                            </p>
                         <?php endif; ?>
-                    </div>
+                    <?php endif; ?>
                 </div>
                 
-                <div class="wpgl-dashboard-card">
-                    <div class="wpgl-card-header">
-                        <h2><?php _e('Quick Usage Guide', 'wp-gallery-link'); ?></h2>
-                    </div>
-                    <div class="wpgl-card-content">
-                        <ol class="wpgl-steps">
-                            <li><?php _e('Configure your Google API credentials in the settings', 'wp-gallery-link'); ?></li>
-                            <li><?php _e('Connect to Google Photos', 'wp-gallery-link'); ?></li>
-                            <li><?php _e('Import albums from Google Photos', 'wp-gallery-link'); ?></li>
-                            <li><?php _e('Organize albums with categories', 'wp-gallery-link'); ?></li>
-                            <li><?php _e('Display albums using the shortcode', 'wp-gallery-link'); ?></li>
-                        </ol>
-                        <div class="wpgl-shortcode-example">
-                            <code>[wp_gallery_link]</code>
-                            <span class="wpgl-shortcode-copy" 
-                                  onclick="navigator.clipboard.writeText('[wp_gallery_link]')">
-                                <span class="dashicons dashicons-clipboard"></span>
-                            </span>
-                        </div>
-                    </div>
+                <div class="wpgl-section">
+                    <h2><?php _e('Shortcode Usage', 'wp-gallery-link'); ?></h2>
+                    
+                    <p><?php _e('Use the following shortcode to display albums:', 'wp-gallery-link'); ?></p>
+                    
+                    <pre><code>[wp_gallery_link]</code></pre>
+                    
+                    <p><?php _e('Shortcode parameters:', 'wp-gallery-link'); ?></p>
+                    
+                    <ul>
+                        <li><code>category</code>: <?php _e('Display albums from a specific category (use the category slug).', 'wp-gallery-link'); ?></li>
+                        <li><code>orderby</code>: <?php _e('Order albums by "title", "date", "custom" (default), or "random".', 'wp-gallery-link'); ?></li>
+                        <li><code>order</code>: <?php _e('Sort order, "asc" (default) or "desc".', 'wp-gallery-link'); ?></li>
+                        <li><code>limit</code>: <?php _e('Number of albums to display (default: -1, all albums).', 'wp-gallery-link'); ?></li>
+                        <li><code>columns</code>: <?php _e('Number of columns (default: 3).', 'wp-gallery-link'); ?></li>
+                    </ul>
+                    
+                    <p><?php _e('Example:', 'wp-gallery-link'); ?></p>
+                    
+                    <pre><code>[wp_gallery_link category="vacation" orderby="date" order="desc" limit="6" columns="4"]</code></pre>
                 </div>
             </div>
         </div>
-        <style>
-            .wpgl-dashboard-grid {
-                display: grid;
-                grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-                gap: 20px;
-                margin-top: 20px;
-            }
-            .wpgl-dashboard-card {
-                border: 1px solid #ccd0d4;
-                background-color: #fff;
-                border-radius: 4px;
-                box-shadow: 0 1px 1px rgba(0,0,0,.04);
-                display: flex;
-                flex-direction: column;
-            }
-            .wpgl-card-header {
-                border-bottom: 1px solid #ccd0d4;
-                padding: 12px 15px;
-            }
-            .wpgl-card-header h2 {
-                margin: 0;
-                font-size: 14px;
-                font-weight: 600;
-            }
-            .wpgl-card-content {
-                padding: 15px;
-                flex-grow: 1;
-            }
-            .wpgl-card-footer {
-                border-top: 1px solid #ccd0d4;
-                padding: 12px 15px;
-                background-color: #f8f9fa;
-                text-align: right;
-            }
-            .wpgl-stat-item {
-                margin-bottom: 15px;
-            }
-            .wpgl-stat-value {
-                display: block;
-                font-size: 32px;
-                font-weight: bold;
-                line-height: 1.2;
-            }
-            .wpgl-stat-label {
-                font-size: 14px;
-                color: #646970;
-            }
-            .wpgl-connection-status {
-                padding: 10px;
-                border-radius: 3px;
-                margin-bottom: 15px;
-                font-weight: 500;
-                display: flex;
-                align-items: center;
-            }
-            .wpgl-connection-status .dashicons {
-                margin-right: 8px;
-            }
-            .wpgl-status-success {
-                background-color: #ecf7ed;
-                color: #0c5460;
-            }
-            .wpgl-status-warning {
-                background-color: #fff8e5;
-                color: #856404;
-            }
-            .wpgl-status-error {
-                background-color: #f8d7da;
-                color: #721c24;
-            }
-            .wpgl-steps {
-                margin-left: 18px;
-            }
-            .wpgl-steps li {
-                margin-bottom: 8px;
-            }
-            .wpgl-shortcode-example {
-                background: #f0f0f1;
-                padding: 10px 15px;
-                border-radius: 3px;
-                position: relative;
-                margin-top: 15px;
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-            }
-            .wpgl-shortcode-copy {
-                cursor: pointer;
-            }
-            .wpgl-shortcode-copy:hover {
-                color: #007cba;
-            }
-        </style>
         <?php
     }
     
@@ -369,694 +258,86 @@ class WP_Gallery_Link_Admin {
      * Render import page
      */
     public function render_import_page() {
-        $google_api = wp_gallery_link()->google_api;
-        $is_authorized = $google_api->is_authorized();
-        $has_credentials = !empty(get_option('wpgl_google_client_id')) && !empty(get_option('wpgl_google_client_secret'));
-        
-        ?>
-        <div class="wrap wpgl-admin">
-            <h1><?php _e('Import Albums from Google Photos', 'wp-gallery-link'); ?></h1>
-            
-            <?php if (!$has_credentials): ?>
-                <div class="notice notice-error">
-                    <p>
-                        <?php _e('Google API credentials are not configured.', 'wp-gallery-link'); ?>
-                        <a href="<?php echo admin_url('admin.php?page=wp-gallery-link-settings'); ?>">
-                            <?php _e('Configure API Settings', 'wp-gallery-link'); ?>
-                        </a>
-                    </p>
-                </div>
-            <?php elseif (!$is_authorized): ?>
-                <div class="notice notice-warning">
-                    <p>
-                        <?php _e('Not connected to Google Photos.', 'wp-gallery-link'); ?>
-                        <a href="<?php echo esc_url($google_api->get_auth_url()); ?>" class="button button-small">
-                            <?php _e('Connect Now', 'wp-gallery-link'); ?>
-                        </a>
-                    </p>
-                </div>
-            <?php else: ?>
-                <p><?php _e('Select albums from your Google Photos account to import into WordPress.', 'wp-gallery-link'); ?></p>
-                
-                <div class="wpgl-import-container">
-                    <div class="wpgl-loading-container">
-                        <div class="wpgl-loading-status">
-                            <span class="spinner is-active"></span>
-                            <span class="wpgl-loading-text"><?php _e('Loading albums...', 'wp-gallery-link'); ?></span>
-                        </div>
-                        <div class="wpgl-progress-bar">
-                            <div class="wpgl-progress-value"></div>
-                        </div>
-                        <div class="wpgl-loading-log"></div>
-                    </div>
-                    
-                    <div class="wpgl-albums-container">
-                        <div class="wpgl-albums-grid"></div>
-                    </div>
-                    
-                    <button class="button button-primary wpgl-load-albums">
-                        <?php _e('Load Albums', 'wp-gallery-link'); ?>
-                    </button>
-                    <button class="button wpgl-load-demo-albums">
-                        <?php _e('Load Demo Albums', 'wp-gallery-link'); ?>
-                    </button>
-                </div>
-                
-                <!-- Album template -->
-                <script type="text/html" id="tmpl-wpgl-album">
-                    <div class="wpgl-album" data-id="{{ data.id }}">
-                        <div class="wpgl-album-inner">
-                            <div class="wpgl-album-thumbnail">
-                                <# if (data.coverPhotoBaseUrl) { #>
-                                    <img src="{{ data.coverPhotoBaseUrl }}=w400-h300" alt="{{ data.title }}">
-                                <# } else { #>
-                                    <div class="wpgl-no-thumbnail">
-                                        <span class="dashicons dashicons-format-gallery"></span>
-                                    </div>
-                                <# } #>
-                            </div>
-                            
-                            <div class="wpgl-album-content">
-                                <h3 class="wpgl-album-title">{{ data.title }}</h3>
-                                <div class="wpgl-album-meta">
-                                    <# if (data.mediaItemsCount) { #>
-                                        <span class="wpgl-album-count">{{ data.mediaItemsCount }} <?php _e('photos', 'wp-gallery-link'); ?></span>
-                                    <# } #>
-                                </div>
-                            </div>
-                            
-                            <div class="wpgl-album-actions">
-                                <# if (data.imported) { #>
-                                    <span class="wpgl-imported-label"><?php _e('Imported', 'wp-gallery-link'); ?></span>
-                                    <a href="{{ data.editLink }}" class="button button-small" target="_blank"><?php _e('Edit', 'wp-gallery-link'); ?></a>
-                                    <a href="{{ data.viewLink }}" class="button button-small" target="_blank"><?php _e('View', 'wp-gallery-link'); ?></a>
-                                <# } else { #>
-                                    <button class="button wpgl-import-album" data-id="{{ data.id }}">
-                                        <?php _e('Import', 'wp-gallery-link'); ?>
-                                    </button>
-                                <# } #>
-                            </div>
-                        </div>
-                    </div>
-                </script>
-            <?php endif; ?>
-        </div>
-        <?php
-    }
-    
-    /**
-     * Render settings page
-     */
-    public function render_settings_page() {
-        ?>
-        <div class="wrap wpgl-admin">
-            <h1><?php _e('WP Gallery Link Settings', 'wp-gallery-link'); ?></h1>
-            
-            <form method="post" action="options.php">
-                <?php settings_fields('wpgl_settings'); ?>
-                <?php do_settings_sections('wpgl_settings'); ?>
-                
-                <div class="wpgl-settings-section">
-                    <h2><?php _e('Google API Settings', 'wp-gallery-link'); ?></h2>
-                    <p class="description">
-                        <?php _e('To use this plugin, you need to create a project in the Google API Console and configure OAuth credentials.', 'wp-gallery-link'); ?>
-                        <a href="https://console.developers.google.com/" target="_blank">
-                            <?php _e('Google API Console', 'wp-gallery-link'); ?> <span class="dashicons dashicons-external"></span>
-                        </a>
-                    </p>
-                    
-                    <table class="form-table">
-                        <tr>
-                            <th scope="row">
-                                <label for="wpgl_google_client_id"><?php _e('Client ID', 'wp-gallery-link'); ?></label>
-                            </th>
-                            <td>
-                                <input type="text" 
-                                       id="wpgl_google_client_id"
-                                       name="wpgl_google_client_id"
-                                       value="<?php echo esc_attr(get_option('wpgl_google_client_id')); ?>"
-                                       class="regular-text">
-                                <p class="description">
-                                    <?php _e('Your Google OAuth Client ID', 'wp-gallery-link'); ?>
-                                </p>
-                            </td>
-                        </tr>
-                        <tr>
-                            <th scope="row">
-                                <label for="wpgl_google_client_secret"><?php _e('Client Secret', 'wp-gallery-link'); ?></label>
-                            </th>
-                            <td>
-                                <input type="password" 
-                                       id="wpgl_google_client_secret"
-                                       name="wpgl_google_client_secret"
-                                       value="<?php echo esc_attr(get_option('wpgl_google_client_secret')); ?>"
-                                       class="regular-text">
-                                <p class="description">
-                                    <?php _e('Your Google OAuth Client Secret', 'wp-gallery-link'); ?>
-                                </p>
-                            </td>
-                        </tr>
-                        <tr>
-                            <th scope="row">
-                                <?php _e('Redirect URI', 'wp-gallery-link'); ?>
-                            </th>
-                            <td>
-                                <code><?php echo admin_url('admin.php?page=wp-gallery-link-auth'); ?></code>
-                                <p class="description">
-                                    <?php _e('Use this URL in your Google API Console as the authorized redirect URI', 'wp-gallery-link'); ?>
-                                    <button type="button" class="button button-small" onclick="navigator.clipboard.writeText('<?php echo admin_url('admin.php?page=wp-gallery-link-auth'); ?>')">
-                                        <?php _e('Copy', 'wp-gallery-link'); ?>
-                                    </button>
-                                </p>
-                            </td>
-                        </tr>
-                    </table>
-                </div>
-                
-                <div class="wpgl-settings-section">
-                    <h2><?php _e('Display Settings', 'wp-gallery-link'); ?></h2>
-                    
-                    <table class="form-table">
-                        <tr>
-                            <th scope="row">
-                                <label for="wpgl_shortcode_columns"><?php _e('Default Columns', 'wp-gallery-link'); ?></label>
-                            </th>
-                            <td>
-                                <select id="wpgl_shortcode_columns" name="wpgl_shortcode_columns">
-                                    <?php for ($i = 1; $i <= 6; $i++): ?>
-                                        <option value="<?php echo $i; ?>" <?php selected(get_option('wpgl_shortcode_columns', 3), $i); ?>>
-                                            <?php echo $i; ?>
-                                        </option>
-                                    <?php endfor; ?>
-                                </select>
-                                <p class="description">
-                                    <?php _e('Default number of columns for the gallery display', 'wp-gallery-link'); ?>
-                                </p>
-                            </td>
-                        </tr>
-                    </table>
-                </div>
-                
-                <div class="wpgl-settings-section">
-                    <h2><?php _e('Debug Settings', 'wp-gallery-link'); ?></h2>
-                    
-                    <table class="form-table">
-                        <tr>
-                            <th scope="row">
-                                <label for="wpgl_enable_debug"><?php _e('Enable Debug Mode', 'wp-gallery-link'); ?></label>
-                            </th>
-                            <td>
-                                <input type="checkbox" 
-                                       id="wpgl_enable_debug" 
-                                       name="wpgl_enable_debug" 
-                                       value="1" 
-                                       <?php checked(get_option('wpgl_enable_debug', true)); ?>>
-                                <p class="description">
-                                    <?php _e('Enable detailed logging for troubleshooting.', 'wp-gallery-link'); ?>
-                                    <a href="<?php echo admin_url('admin.php?page=wp-gallery-link-debug'); ?>">
-                                        <?php _e('View Debug Log', 'wp-gallery-link'); ?>
-                                    </a>
-                                </p>
-                            </td>
-                        </tr>
-                    </table>
-                </div>
-                
-                <?php submit_button(); ?>
-            </form>
-        </div>
-        <?php
-    }
-    
-    /**
-     * Render authorization callback page
-     */
-    public function render_auth_callback_page() {
-        $success = isset($_GET['success']) ? filter_var($_GET['success'], FILTER_VALIDATE_BOOLEAN) : false;
-        $error = isset($_GET['error']) ? sanitize_text_field($_GET['error']) : '';
-        
-        ?>
-        <div class="wrap wpgl-admin">
-            <h1><?php _e('Google Photos Authorization', 'wp-gallery-link'); ?></h1>
-            
-            <div class="wpgl-auth-result">
-                <?php if ($success): ?>
-                    <div class="wpgl-auth-success">
-                        <span class="dashicons dashicons-yes-alt"></span>
-                        <div class="wpgl-auth-message">
-                            <h2><?php _e('Authorization Successful!', 'wp-gallery-link'); ?></h2>
-                            <p><?php _e('Your site is now connected to Google Photos.', 'wp-gallery-link'); ?></p>
-                        </div>
-                    </div>
-                <?php else: ?>
-                    <div class="wpgl-auth-error">
-                        <span class="dashicons dashicons-no"></span>
-                        <div class="wpgl-auth-message">
-                            <h2><?php _e('Authorization Failed', 'wp-gallery-link'); ?></h2>
-                            <?php if ($error): ?>
-                                <p><?php echo esc_html($error); ?></p>
-                            <?php else: ?>
-                                <p><?php _e('An error occurred during the authorization process.', 'wp-gallery-link'); ?></p>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-                <?php endif; ?>
-                
-                <div class="wpgl-auth-actions">
-                    <?php if ($success): ?>
-                        <a href="<?php echo admin_url('admin.php?page=wp-gallery-link-import'); ?>" class="button button-primary">
-                            <?php _e('Import Albums', 'wp-gallery-link'); ?>
-                        </a>
-                    <?php else: ?>
-                        <a href="<?php echo admin_url('admin.php?page=wp-gallery-link-settings'); ?>" class="button button-secondary">
-                            <?php _e('Check API Settings', 'wp-gallery-link'); ?>
-                        </a>
-                        <?php 
-                        $google_api = wp_gallery_link()->google_api;
-                        if ($google_api->get_auth_url()): 
-                        ?>
-                            <a href="<?php echo esc_url($google_api->get_auth_url()); ?>" class="button button-primary">
-                                <?php _e('Try Again', 'wp-gallery-link'); ?>
-                            </a>
-                        <?php endif; ?>
-                    <?php endif; ?>
-                    
-                    <a href="<?php echo admin_url('admin.php?page=wp-gallery-link'); ?>" class="button button-secondary">
-                        <?php _e('Back to Dashboard', 'wp-gallery-link'); ?>
-                    </a>
-                </div>
-            </div>
-        </div>
-        <style>
-            .wpgl-auth-result {
-                max-width: 600px;
-                margin: 50px auto;
-                text-align: center;
-                padding: 30px;
-                background: #fff;
-                border-radius: 5px;
-                box-shadow: 0 1px 3px rgba(0,0,0,.1);
-            }
-            .wpgl-auth-success, .wpgl-auth-error {
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                margin-bottom: 30px;
-            }
-            .wpgl-auth-success .dashicons, .wpgl-auth-error .dashicons {
-                font-size: 48px;
-                width: 48px;
-                height: 48px;
-                margin-right: 20px;
-            }
-            .wpgl-auth-success .dashicons {
-                color: #46b450;
-            }
-            .wpgl-auth-error .dashicons {
-                color: #dc3232;
-            }
-            .wpgl-auth-message {
-                text-align: left;
-            }
-            .wpgl-auth-message h2 {
-                margin-top: 0;
-            }
-            .wpgl-auth-actions {
-                margin-top: 30px;
-            }
-            .wpgl-auth-actions .button {
-                margin: 0 5px;
-            }
-        </style>
-        <?php
-    }
-    
-    /**
-     * Handle authorization callback
-     */
-    public function handle_auth_callback() {
-        if (!isset($_GET['page']) || $_GET['page'] !== 'wp-gallery-link-auth') {
+        if (!current_user_can('manage_options')) {
             return;
         }
         
-        if (!current_user_can('manage_options')) {
-            wp_die(__('You do not have sufficient permissions to access this page.', 'wp-gallery-link'));
-        }
-        
-        // Handle authorization code
-        if (isset($_GET['code'])) {
-            $google_api = wp_gallery_link()->google_api;
-            $success = $google_api->exchange_code_for_token($_GET['code']);
-            
-            if ($success) {
-                wp_redirect(admin_url('admin.php?page=wp-gallery-link-auth&success=1'));
-                exit;
-            } else {
-                wp_redirect(admin_url('admin.php?page=wp-gallery-link-auth&success=0&error=' . urlencode(__('Failed to obtain access token', 'wp-gallery-link'))));
-                exit;
-            }
-        }
-        
-        // Handle authorization errors
-        if (isset($_GET['error'])) {
-            $error = sanitize_text_field($_GET['error']);
-            wp_redirect(admin_url('admin.php?page=wp-gallery-link-auth&success=0&error=' . urlencode($error)));
-            exit;
-        }
-    }
-    
-    /**
-     * AJAX handler for importing an album
-     */
-    public function ajax_import_album() {
-        // Check nonce for security
-        if (!check_ajax_referer('wpgl_import_album', 'nonce', false)) {
-            wp_send_json_error(array('message' => __('Security check failed', 'wp-gallery-link')));
-        }
-        
-        // Check user capabilities
-        if (!current_user_can('edit_posts')) {
-            wp_send_json_error(array('message' => __('Insufficient permissions', 'wp-gallery-link')));
-        }
-        
-        // Check for required parameters
-        if (!isset($_POST['album']) || !is_array($_POST['album'])) {
-            wp_send_json_error(array('message' => __('Missing album data', 'wp-gallery-link')));
-        }
-        
-        $album = $_POST['album'];
-        
-        // Import album
-        $google_api = wp_gallery_link()->google_api;
-        $result = $google_api->import_album($album);
-        
-        if (is_wp_error($result)) {
-            wp_send_json_error(array('message' => $result->get_error_message()));
-        }
-        
-        wp_send_json_success(array(
-            'message' => __('Album imported successfully', 'wp-gallery-link'),
-            'post_id' => $result,
-            'edit_url' => get_edit_post_link($result, 'raw')
-        ));
-    }
-    
-    /**
-     * Render debug page
-     */
-    public function render_debug_page() {
-        if (!current_user_can('manage_options')) {
-            wp_die(__('You do not have sufficient permissions to access this page.', 'wp-gallery-link'));
-        }
-        
-        $google_api = wp_gallery_link()->google_api;
-        $log_entries = $google_api->get_debug_log();
-        ?>
-        <div class="wrap wpgl-admin">
-            <h1><?php _e('WP Gallery Link Debug Log', 'wp-gallery-link'); ?></h1>
-            
-            <div class="wpgl-debug-toolbar">
-                <button id="wpgl-refresh-log" class="button">
-                    <span class="dashicons dashicons-update"></span>
-                    <?php _e('Refresh Log', 'wp-gallery-link'); ?>
-                </button>
-                
-                <button id="wpgl-clear-log" class="button">
-                    <span class="dashicons dashicons-trash"></span>
-                    <?php _e('Clear Log', 'wp-gallery-link'); ?>
-                </button>
-                
-                <label>
-                    <input type="checkbox" id="wpgl-auto-refresh"> 
-                    <?php _e('Auto-refresh (10s)', 'wp-gallery-link'); ?>
-                </label>
-            </div>
-            
-            <div class="wpgl-debug-info">
-                <h2><?php _e('System Information', 'wp-gallery-link'); ?></h2>
-                <table class="widefat striped">
-                    <tr>
-                        <th><?php _e('WordPress Version', 'wp-gallery-link'); ?></th>
-                        <td><?php echo get_bloginfo('version'); ?></td>
-                    </tr>
-                    <tr>
-                        <th><?php _e('PHP Version', 'wp-gallery-link'); ?></th>
-                        <td><?php echo phpversion(); ?></td>
-                    </tr>
-                    <tr>
-                        <th><?php _e('Plugin Version', 'wp-gallery-link'); ?></th>
-                        <td><?php echo WP_GALLERY_LINK_VERSION; ?></td>
-                    </tr>
-                    <tr>
-                        <th><?php _e('API Credentials Configured', 'wp-gallery-link'); ?></th>
-                        <td>
-                            <?php 
-                            $has_credentials = !empty(get_option('wpgl_google_client_id')) && !empty(get_option('wpgl_google_client_secret'));
-                            echo $has_credentials ? '<span class="dashicons dashicons-yes"></span> ' . __('Yes', 'wp-gallery-link') : '<span class="dashicons dashicons-no"></span> ' . __('No', 'wp-gallery-link');
-                            ?>
-                        </td>
-                    </tr>
-                    <tr>
-                        <th><?php _e('API Authorized', 'wp-gallery-link'); ?></th>
-                        <td>
-                            <?php 
-                            echo $google_api->is_authorized() ? '<span class="dashicons dashicons-yes"></span> ' . __('Yes', 'wp-gallery-link') : '<span class="dashicons dashicons-no"></span> ' . __('No', 'wp-gallery-link');
-                            ?>
-                        </td>
-                    </tr>
-                </table>
-            </div>
-            
-            <div class="wpgl-debug-log-container">
-                <h2><?php _e('Debug Log', 'wp-gallery-link'); ?></h2>
-                
-                <?php if (empty($log_entries)): ?>
-                    <div class="notice notice-info">
-                        <p><?php _e('No log entries found.', 'wp-gallery-link'); ?></p>
-                    </div>
-                <?php else: ?>
-                    <div id="wpgl-debug-log" class="wpgl-debug-log">
-                        <?php foreach ($log_entries as $entry): ?>
-                            <div class="wpgl-log-entry"><?php echo esc_html($entry); ?></div>
-                        <?php endforeach; ?>
-                    </div>
-                <?php endif; ?>
-            </div>
-        </div>
-        
-        <script>
-        jQuery(document).ready(function($) {
-            var autoRefreshInterval;
-            
-            // Refresh log
-            function refreshLog() {
-                $.ajax({
-                    url: ajaxurl,
-                    method: 'POST',
-                    data: {
-                        action: 'wpgl_get_debug_log',
-                        nonce: wpglAdmin.debugNonce
-                    },
-                    success: function(response) {
-                        if (response.success && response.data.log) {
-                            var logHtml = '';
-                            $.each(response.data.log, function(index, entry) {
-                                logHtml += '<div class="wpgl-log-entry">' + entry + '</div>';
-                            });
-                            $('#wpgl-debug-log').html(logHtml);
-                        }
-                    }
-                });
-            }
-            
-            // Clear log
-            $('#wpgl-clear-log').on('click', function() {
-                if (confirm('<?php _e('Are you sure you want to clear the debug log?', 'wp-gallery-link'); ?>')) {
-                    $.ajax({
-                        url: ajaxurl,
-                        method: 'POST',
-                        data: {
-                            action: 'wpgl_clear_debug_log',
-                            nonce: wpglAdmin.debugNonce
-                        },
-                        success: function(response) {
-                            if (response.success) {
-                                $('#wpgl-debug-log').html('<div class="wpgl-log-entry"><?php _e('Log cleared.', 'wp-gallery-link'); ?></div>');
-                            }
-                        }
-                    });
-                }
-            });
-            
-            // Manual refresh
-            $('#wpgl-refresh-log').on('click', function() {
-                refreshLog();
-            });
-            
-            // Auto-refresh toggle
-            $('#wpgl-auto-refresh').on('change', function() {
-                if ($(this).is(':checked')) {
-                    autoRefreshInterval = setInterval(refreshLog, 10000);
-                } else {
-                    clearInterval(autoRefreshInterval);
-                }
-            });
-        });
-        </script>
-        
-        <style>
-            .wpgl-debug-toolbar {
-                margin: 20px 0;
-                display: flex;
-                align-items: center;
-                gap: 10px;
-            }
-            
-            .wpgl-debug-log-container {
-                margin-top: 20px;
-            }
-            
-            .wpgl-debug-log {
-                background: #f0f0f1;
-                border: 1px solid #ccc;
-                padding: 10px;
-                height: 400px;
-                overflow-y: auto;
-                font-family: monospace;
-                font-size: 12px;
-                white-space: pre-wrap;
-                word-wrap: break-word;
-            }
-            
-            .wpgl-log-entry {
-                padding: 2px 0;
-                border-bottom: 1px solid #eee;
-            }
-            
-            .wpgl-log-entry:last-child {
-                border-bottom: none;
-            }
-            
-            .wpgl-debug-info {
-                margin-top: 20px;
-            }
-            
-            .wpgl-debug-info table {
-                table-layout: fixed;
-            }
-            
-            .wpgl-debug-info th {
-                width: 300px;
-            }
-        </style>
-        <?php
-    }
-    
-    /**
-     * AJAX handler for clearing debug log
-     */
-    public function ajax_clear_debug_log() {
-        // Check nonce for security
-        if (!check_ajax_referer('wpgl_debug', 'nonce', false)) {
-            wp_send_json_error(array('message' => __('Security check failed', 'wp-gallery-link')));
-        }
-        
-        // Check user capabilities
-        if (!current_user_can('manage_options')) {
-            wp_send_json_error(array('message' => __('Insufficient permissions', 'wp-gallery-link')));
-        }
-        
-        // Clear log
-        $google_api = wp_gallery_link()->google_api;
-        $google_api->clear_debug_log();
-        
-        wp_send_json_success(array('message' => __('Log cleared', 'wp-gallery-link')));
-    }
-    
-    /**
-     * AJAX handler for getting debug log
-     */
-    public function ajax_get_debug_log() {
-        // Check nonce for security
-        if (!check_ajax_referer('wpgl_debug', 'nonce', false)) {
-            wp_send_json_error(array('message' => __('Security check failed', 'wp-gallery-link')));
-        }
-        
-        // Check user capabilities
-        if (!current_user_can('manage_options')) {
-            wp_send_json_error(array('message' => __('Insufficient permissions', 'wp-gallery-link')));
-        }
-        
-        // Get log
-        $google_api = wp_gallery_link()->google_api;
-        $log = $google_api->get_debug_log();
-        
-        wp_send_json_success(array('log' => $log));
-    }
-    
-    /**
-     * AJAX handler for testing API connection
-     */
-    public function ajax_test_api() {
-        // Check nonce for security
-        if (!check_ajax_referer('wpgl_debug', 'nonce', false)) {
-            wp_send_json_error(array('message' => __('Security check failed', 'wp-gallery-link')));
-        }
-        
-        // Check user capabilities
-        if (!current_user_can('manage_options')) {
-            wp_send_json_error(array('message' => __('Insufficient permissions', 'wp-gallery-link')));
-        }
-        
-        // Test API connection
         $google_api = wp_gallery_link()->google_api;
         
         if (!$google_api->is_connected()) {
-            wp_send_json_error(array('message' => __('API credentials not configured', 'wp-gallery-link')));
-            return;
+            wp_redirect(admin_url('admin.php?page=wp-gallery-link'));
+            exit;
         }
         
-        if (!$google_api->is_authorized()) {
-            wp_send_json_error(array('message' => __('Not authorized with Google Photos', 'wp-gallery-link')));
-            return;
-        }
+        // Check if we've just imported an album
+        $album_imported = isset($_GET['imported']) ? absint($_GET['imported']) : 0;
+        ?>
+        <div class="wrap">
+            <h1><?php _e('Import Albums from Google Photos', 'wp-gallery-link'); ?></h1>
+            
+            <?php if ($album_imported > 0): ?>
+                <div class="notice notice-success is-dismissible">
+                    <p><?php _e('Album imported successfully!', 'wp-gallery-link'); ?></p>
+                </div>
+            <?php endif; ?>
+            
+            <div class="wpgl-import-container">
+                <div class="wpgl-import-header">
+                    <p>
+                        <?php _e('Select albums to import from your Google Photos account. You can then edit them, assign categories, and customize their display.', 'wp-gallery-link'); ?>
+                    </p>
+                    <button class="button button-primary wpgl-load-albums">
+                        <?php _e('Load Albums from Google Photos', 'wp-gallery-link'); ?>
+                    </button>
+                </div>
+                
+                <div class="wpgl-loading-container">
+                    <div class="wpgl-loading-status">
+                        <span class="spinner is-active"></span>
+                        <span class="wpgl-loading-text"><?php _e('Loading albums...', 'wp-gallery-link'); ?></span>
+                    </div>
+                    
+                    <div class="wpgl-progress">
+                        <div class="wpgl-progress-bar">
+                            <div class="wpgl-progress-value" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="wpgl-loading-log-wrap">
+                        <h4><?php _e('Loading Log', 'wp-gallery-link'); ?></h4>
+                        <div class="wpgl-loading-log"></div>
+                    </div>
+                </div>
+                
+                <div class="wpgl-albums-container" style="display: none;">
+                    <h2><?php _e('Available Albums', 'wp-gallery-link'); ?></h2>
+                    <div class="wpgl-albums-grid"></div>
+                </div>
+            </div>
+        </div>
         
-        // Try to fetch albums as a connection test
-        $result = $google_api->fetch_albums();
-        
-        if (is_wp_error($result)) {
-            wp_send_json_error(array('message' => $result->get_error_message()));
-            return;
-        }
-        
-        wp_send_json_success(array(
-            'message' => __('API connection successful', 'wp-gallery-link'),
-            'albums_count' => count($result)
-        ));
-    }
-    
-    /**
-     * AJAX handler for refreshing access token
-     */
-    public function ajax_refresh_token() {
-        // Check nonce for security
-        if (!check_ajax_referer('wpgl_debug', 'nonce', false)) {
-            wp_send_json_error(array('message' => __('Security check failed', 'wp-gallery-link')));
-        }
-        
-        // Check user capabilities
-        if (!current_user_can('manage_options')) {
-            wp_send_json_error(array('message' => __('Insufficient permissions', 'wp-gallery-link')));
-        }
-        
-        // Refresh token
-        $google_api = wp_gallery_link()->google_api;
-        $result = $google_api->refresh_access_token();
-        
-        if ($result) {
-            wp_send_json_success(array('message' => __('Token refreshed successfully', 'wp-gallery-link')));
-        } else {
-            wp_send_json_error(array('message' => __('Failed to refresh token', 'wp-gallery-link')));
-        }
+        <script type="text/template" id="tmpl-wpgl-album">
+            <div class="wpgl-album" data-id="{{ data.id }}">
+                <div class="wpgl-album-img">
+                    <# if (data.coverPhotoBaseUrl) { #>
+                        <img src="{{ data.coverPhotoBaseUrl }}=w300-h200" alt="{{ data.title }}">
+                    <# } else { #>
+                        <div class="wpgl-no-image"><?php _e('No Cover Image', 'wp-gallery-link'); ?></div>
+                    <# } #>
+                </div>
+                <div class="wpgl-album-info">
+                    <h3 class="wpgl-album-title">{{ data.title }}</h3>
+                    <div class="wpgl-album-meta">
+                        <span class="wpgl-album-count">{{ data.mediaItemsCount }} <?php _e('photos', 'wp-gallery-link'); ?></span>
+                    </div>
+                    <div class="wpgl-album-actions">
+                        <button class="button button-primary wpgl-import-album" data-id="{{ data.id }}">
+                            <?php _e('Import Album', 'wp-gallery-link'); ?>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </script>
+        <?php
     }
 }
