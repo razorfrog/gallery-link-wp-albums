@@ -1,4 +1,3 @@
-
 jQuery(document).ready(function($) {
     'use strict';
     
@@ -28,6 +27,7 @@ jQuery(document).ready(function($) {
     // Immediately log that the script has loaded
     logDebug('Admin script initialized');
     console.log('WP Gallery Link admin.js loaded successfully');
+    console.log('Checking for wpglAdmin object:', typeof wpglAdmin !== 'undefined' ? 'Available' : 'Not available');
     
     /**
      * Add a message to the loading log
@@ -67,7 +67,7 @@ jQuery(document).ready(function($) {
     }
     
     /**
-     * Render an album in the grid - NO TEMPLATES, direct HTML creation
+     * Render an album in the grid - Using direct HTML creation to avoid template issues
      */
     function renderAlbum(album) {
         logDebug('Rendering album:', album);
@@ -75,34 +75,35 @@ jQuery(document).ready(function($) {
 
         const $albumsGrid = $('.wpgl-albums-grid');
         
-        if ($albumsGrid.length) {
-            // Create a default cover image if one isn't provided
-            const coverImageUrl = album.coverPhotoBaseUrl || 'https://via.placeholder.com/200x200?text=No+Cover';
+        if (!$albumsGrid.length) {
+            console.error('WP Gallery Link: Albums grid container not found!');
+            addLoadingLog('Error: Album grid container not found in the DOM.');
+            return;
+        }
             
-            // Create album HTML directly - NO TEMPLATES
-            const albumHtml = `
-                <div class="wpgl-album" data-id="${album.id}">
-                    <div class="wpgl-album-cover-container">
-                        <img src="${coverImageUrl}" alt="${album.title}" class="wpgl-album-cover">
+        // Create a default cover image if one isn't provided
+        const coverImageUrl = album.coverPhotoBaseUrl || 'https://via.placeholder.com/200x200?text=No+Cover';
+        
+        // Create album HTML directly in JavaScript
+        const albumHtml = `
+            <div class="wpgl-album" data-id="${album.id}">
+                <div class="wpgl-album-cover-container">
+                    <img src="${coverImageUrl}" alt="${album.title}" class="wpgl-album-cover">
+                </div>
+                <div class="wpgl-album-info">
+                    <h3 class="wpgl-album-title">${album.title}</h3>
+                    <div class="wpgl-album-meta">
+                        ${album.mediaItemsCount ? `<span class="wpgl-album-count">${album.mediaItemsCount} photos</span>` : ''}
                     </div>
-                    <div class="wpgl-album-info">
-                        <h3 class="wpgl-album-title">${album.title}</h3>
-                        <div class="wpgl-album-meta">
-                            ${album.mediaItemsCount ? `<span class="wpgl-album-count">${album.mediaItemsCount} photos</span>` : ''}
-                        </div>
-                        <div class="wpgl-album-actions">
-                            <button class="button button-primary wpgl-import-album" data-id="${album.id}">Import</button>
-                        </div>
+                    <div class="wpgl-album-actions">
+                        <button class="button button-primary wpgl-import-album" data-id="${album.id}">Import</button>
                     </div>
                 </div>
-            `;
-            
-            $albumsGrid.append(albumHtml);
-            logDebug('Album rendered successfully:', album.title);
-        } else {
-            console.error('WP Gallery Link: Albums grid container not found!');
-            logDebug('ERROR: Album grid container not found!');
-        }
+            </div>
+        `;
+        
+        $albumsGrid.append(albumHtml);
+        logDebug('Album HTML rendered successfully. Album ID:', album.id);
     }
     
     /**
@@ -213,11 +214,11 @@ jQuery(document).ready(function($) {
                     // Show the albums container
                     $('.wpgl-albums-container').show();
                     
-                    // Render each album
+                    // Render each album directly without using templates
                     albums.forEach(function(album) {
                         albumsFound.push(album);
                         addAlbumToList(album.title);
-                        renderAlbum(album);
+                        renderAlbum(album);  // This uses direct HTML generation now
                     });
                     
                     updateProgress(75);
@@ -450,5 +451,25 @@ jQuery(document).ready(function($) {
             loadAlbums();
         });
     });
+    
+    // Add direct event listener for the start button
+    document.addEventListener('DOMContentLoaded', function() {
+        if (document.getElementById('wpgl-start-loading')) {
+            document.getElementById('wpgl-start-loading').addEventListener('click', function(e) {
+                console.log('Start loading button clicked (via addEventListener)');
+                e.preventDefault();
+                resetAlbumLoading();
+                loadAlbums();
+            });
+        }
+        
+        // Auto-start in demo mode
+        if (typeof wpglAdmin !== 'undefined' && wpglAdmin.demoMode === true) {
+            console.log('WP Gallery Link: Demo mode is active, auto-starting album load');
+            setTimeout(function() {
+                resetAlbumLoading();
+                loadAlbums();
+            }, 500);
+        }
+    });
 });
-

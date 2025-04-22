@@ -52,11 +52,31 @@ class WP_Gallery_Link {
             $this->log('WP Gallery Link: Main class initialized', 'info');
         }
         
-        // Initialize CPT
+        // Verify CPT class availability with detailed debugging
+        if (!class_exists('WP_Gallery_Link_CPT')) {
+            $this->log('WP_Gallery_Link_CPT class does not exist yet. Currently loaded classes: ' . implode(', ', get_declared_classes()), 'error');
+            
+            // Try to explicitly include the CPT file
+            $possible_cpt_paths = array(
+                WP_GALLERY_LINK_PATH . 'includes/class-wp-gallery-link-cpt.php',
+                WP_GALLERY_LINK_PATH . 'class-wp-gallery-link-cpt.php'
+            );
+            
+            foreach ($possible_cpt_paths as $path) {
+                if (file_exists($path)) {
+                    $this->log('Attempting to manually include CPT class from: ' . $path, 'info');
+                    include_once $path;
+                    break;
+                }
+            }
+        }
+        
+        // Initialize CPT with additional error checking
         if (class_exists('WP_Gallery_Link_CPT')) {
             $this->cpt = new WP_Gallery_Link_CPT();
+            $this->log('CPT class successfully initialized', 'info');
         } else {
-            $this->log('WP Gallery Link: CPT class not found', 'error');
+            $this->log('WP Gallery Link: CPT class not found after manual inclusion attempts', 'error');
             add_action('admin_notices', function() {
                 echo '<div class="error"><p>Google Photos Albums: Critical error - Could not find CPT class.</p></div>';
             });
@@ -265,6 +285,12 @@ class WP_Gallery_Link {
             ));
         } else {
             $this->log('WP Gallery Link: CPT class or method not available', 'error');
+            if (!isset($this->cpt)) {
+                $this->log('WP Gallery Link: $this->cpt is not set', 'error');
+            }
+            if (isset($this->cpt) && !method_exists($this->cpt, 'create_album_from_google')) {
+                $this->log('WP Gallery Link: create_album_from_google method not found in CPT class', 'error');
+            }
             wp_send_json_error(array('message' => __('Plugin error: Custom post type handler not available', 'wp-gallery-link')));
         }
     }
