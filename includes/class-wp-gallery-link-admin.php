@@ -73,20 +73,20 @@ class WP_Gallery_Link_Admin {
         wp_localize_script('wp-gallery-link-admin', 'wpglAdmin', array(
             'ajaxUrl' => admin_url('admin-ajax.php'),
             'nonce' => wp_create_nonce('wpgl_debug'),
+            'version' => WP_GALLERY_LINK_VERSION,
+            'debugMode' => WP_GALLERY_LINK_DEBUG,
+            'loadAllAlbums' => true, // Set to load all albums, not just batches
             'i18n' => array(
                 'importing' => __('Importing...', 'wp-gallery-link'),
                 'imported' => __('Imported', 'wp-gallery-link'),
                 'import' => __('Import', 'wp-gallery-link'),
                 'import_success' => __('Album imported successfully!', 'wp-gallery-link'),
                 'import_error' => __('Error importing album:', 'wp-gallery-link'),
-                'loading' => __('Loading albums...', 'wp-gallery-link'),
-                'start' => __('Start Loading Albums', 'wp-gallery-link'),
-                'stop' => __('Stop Loading', 'wp-gallery-link'),
-                'albums_fetched' => __('Albums fetched:', 'wp-gallery-link'),
+                'loading_albums' => __('Loading albums...', 'wp-gallery-link'),
                 'load_more' => __('Load more', 'wp-gallery-link'),
-                'noAlbums' => __('No albums found.', 'wp-gallery-link'),
-                'error' => __('Error:', 'wp-gallery-link'),
-                'stopped' => __('Loading stopped.', 'wp-gallery-link')
+                'no_more_albums' => __('No more albums to load.', 'wp-gallery-link'),
+                'error_loading' => __('Error loading albums:', 'wp-gallery-link'),
+                'no_cover' => __('No Cover Image', 'wp-gallery-link')
             )
         ));
     }
