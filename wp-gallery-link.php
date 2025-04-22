@@ -9,6 +9,11 @@ if (!defined('WPINC')) {
     die;
 }
 
+// Make sure the necessary constants are available
+if (!defined('WP_GALLERY_LINK_DEBUG')) {
+    define('WP_GALLERY_LINK_DEBUG', true);
+}
+
 /**
  * Main plugin class
  */
