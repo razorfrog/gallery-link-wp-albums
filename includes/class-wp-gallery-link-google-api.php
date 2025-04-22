@@ -424,7 +424,7 @@ class WP_Gallery_Link_Google_API {
     public function create_album_post($album_data) {
         // Check if album already exists
         $existing = get_posts(array(
-            'post_type' => 'wp_gallery_album',
+            'post_type' => 'gphoto_album',
             'meta_key' => 'wpgl_album_id',
             'meta_value' => $album_data['id'],
             'posts_per_page' => 1
@@ -437,7 +437,7 @@ class WP_Gallery_Link_Google_API {
             // Create new post
             $post_id = wp_insert_post(array(
                 'post_title' => $album_data['title'],
-                'post_type' => 'wp_gallery_album',
+                'post_type' => 'gphoto_album',
                 'post_status' => 'publish'
             ));
             
