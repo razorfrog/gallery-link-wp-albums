@@ -45,6 +45,54 @@ jQuery(document).ready(function($) {
         }
     }
     
+    // Enhanced troubleshooting data
+    function logElementDetails(selector, name) {
+        var $element = $(selector);
+        console.log('ELEMENT CHECK: ' + name + ' (' + selector + ')');
+        console.log('- Exists:', $element.length > 0);
+        console.log('- Visible:', $element.is(':visible'));
+        console.log('- HTML:', $element.length > 0 ? $element[0].outerHTML : 'Not found');
+        console.log('- CSS display:', $element.css('display'));
+        console.log('- CSS visibility:', $element.css('visibility'));
+        console.log('- Parent visible:', $element.parent().is(':visible'));
+        return $element.length > 0;
+    }
+    
+    // Log DOM state on page load
+    function logDOMState() {
+        console.log('-------------- WP Gallery Link DOM State --------------');
+        logElementDetails('.wpgl-load-albums', 'Load Albums Button (class selector)');
+        logElementDetails('#wpgl-start-loading', 'Start Loading Button (ID selector)');
+        logElementDetails('#wpgl-stop-loading', 'Stop Loading Button');
+        logElementDetails('.wpgl-loading-container', 'Loading Container');
+        logElementDetails('.wpgl-albums-container', 'Albums Container');
+        logElementDetails('.wpgl-loading-log', 'Loading Log');
+        console.log('-------------- End DOM State --------------');
+    }
+    
+    // Log DOM state on page load
+    logDOMState();
+    
+    // Log all click events for debugging
+    $(document).on('click', 'button, a, input[type="button"], input[type="submit"]', function(e) {
+        var $this = $(this);
+        var id = $this.attr('id') || 'no-id';
+        var classes = $this.attr('class') || 'no-classes';
+        var text = $this.text() || $this.val() || 'no-text';
+        
+        console.log('CLICK DETECTED:', {
+            element: this,
+            tagName: this.tagName,
+            id: id,
+            classes: classes,
+            text: text,
+            timeStamp: e.timeStamp,
+            visible: $this.is(':visible'),
+            enabled: !$this.prop('disabled'),
+            eventData: e
+        });
+    });
+    
     /**
      * Custom template rendering for environments where wp.template might not be available
      * (e.g., in the simulated demo environment)
@@ -213,6 +261,7 @@ jQuery(document).ready(function($) {
     function startLoading() {
         // Don't start if already loading
         if (isLoading) {
+            console.log('Already loading, not starting again');
             return;
         }
         
@@ -221,19 +270,31 @@ jQuery(document).ready(function($) {
         isLoading = true;
         
         // Show loading UI
+        console.log('Showing loading UI elements');
+        console.log('- Loading container exists:', $loadingContainer.length > 0);
+        console.log('- Albums log container exists:', $('.wpgl-albums-log-container').length > 0);
+        
         $loadingContainer.show();
+        console.log('- Loading container display after show():', $loadingContainer.css('display'));
+        
         $('.wpgl-albums-log-container').show();
+        console.log('- Albums log container display after show():', $('.wpgl-albums-log-container').css('display'));
         
         // Toggle buttons
         $startButton.hide();
+        console.log('- Start button hidden:', !$startButton.is(':visible'));
+        
         $stopButton.show();
+        console.log('- Stop button visible:', $stopButton.is(':visible'));
         
         addLog('Started loading albums...');
         updateProgress(10, 'Authenticating with Google Photos API...');
         
         // Start simulated loading process
+        console.log('Starting loading interval process');
         loadingInterval = setInterval(function() {
             loadStep++;
+            console.log('Loading step:', loadStep);
             
             // Handle cancellation request
             if (cancelRequested) {
@@ -258,13 +319,16 @@ jQuery(document).ready(function($) {
                 updateProgress(100, 'Albums loaded successfully!');
                 renderAlbums(demoAlbums);
                 $albumsContainer.show();
+                console.log('Albums render complete, container shown');
                 
                 // Finish loading
                 stopLoading();
                 $startButton.show();
                 $stopButton.hide();
+                console.log('Loading process completed');
             }
         }, 700);
+        console.log('Loading interval started, ID:', loadingInterval);
     }
     
     /**
@@ -381,23 +445,49 @@ jQuery(document).ready(function($) {
      * Load albums from Google Photos using AJAX
      * This is the default method
      */
-    $startButton.on('click', function() {
+    $startButton.on('click', function(e) {
+        console.log('======== START BUTTON CLICKED ========');
+        console.log('Event details:', e);
+        console.log('Button details:', {
+            id: $(this).attr('id'),
+            classes: $(this).attr('class'),
+            text: $(this).text(),
+            html: $(this)[0].outerHTML,
+            visible: $(this).is(':visible'),
+            enabled: !$(this).prop('disabled')
+        });
+        
         debugLog('Start button clicked');
-        console.log('Start button clicked');
+        
+        // Check for wpglAdmin
+        if (typeof wpglAdmin === 'undefined') {
+            console.error('wpglAdmin is not defined!');
+            addLog('ERROR: wpglAdmin is not defined - JS localization may be missing');
+        } else {
+            console.log('wpglAdmin is defined:', wpglAdmin);
+        }
         
         // Start loading process
+        console.log('Calling startLoading()...');
         startLoading();
         
         // Add analytics event if available
         if (typeof _paq !== 'undefined') {
             _paq.push(['trackEvent', 'Albums', 'Load', 'Google Photos']);
         }
+        
+        // Re-check DOM state after click
+        setTimeout(function() {
+            console.log('DOM state after click:');
+            logDOMState();
+        }, 100);
     });
     
     /**
      * Stop loading process
      */
     $stopButton.on('click', function() {
+        console.log('======== STOP BUTTON CLICKED ========');
         debugLog('Stop button clicked');
         console.log('Stop button clicked');
         cancelRequested = true;
@@ -509,12 +599,39 @@ jQuery(document).ready(function($) {
     // For auto-loading albums after a short delay
     if (window.location.href.indexOf('page=wp-gallery-link-import') > -1) {
         debugLog('On import page, running API test');
+        console.log('DETECTED: On import page');
+        
+        // Wait a short moment then test API connection
         setTimeout(function() {
+            console.log('Testing API connectivity...');
             testApiConnection();
+            
+            // Log all button states
+            console.log('Button states after page load:');
+            console.log('- Start button:', $startButton.length, 'elements');
+            $startButton.each(function(i) {
+                console.log('  Button', i, ':', $(this).attr('id') || 'no-id', $(this).text(), 'visible:', $(this).is(':visible'));
+            });
+            
+            // Add extra event for Start button since the normal one might not be working
+            console.log('Adding direct click handlers to buttons');
+            $('#wpgl-start-loading, .wpgl-load-albums').on('click', function(e) {
+                console.log('DIRECT CLICK on start button:', e.target);
+                startLoading();
+                return false; // Prevent default and stop propagation
+            });
+            
+            // Check if jQuery events are attached
+            var events = $._data($('#wpgl-start-loading')[0], 'events');
+            console.log('Events attached to start button:', events);
+            
+            // Force enable buttons in case they're disabled
+            $startButton.prop('disabled', false).css('pointer-events', 'auto');
+            
         }, 500);
     }
     
     // Log page initialization
     debugLog('WordPress admin page initialized');
-    console.log('WP Gallery Link admin script loaded');
+    console.log('WP Gallery Link admin script loaded and ready');
 });
