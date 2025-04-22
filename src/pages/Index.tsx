@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -6,7 +5,7 @@ import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { AlbumCard } from "@/components/AlbumCard";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
-import { RefreshCw, Info, Loader, Stop, Play } from "lucide-react";
+import { RefreshCw, Info, Loader, StopCircle, Play } from "lucide-react";
 
 type Album = {
   id: number;
@@ -78,7 +77,6 @@ const Index = () => {
     if (intervalRef.current) clearInterval(intervalRef.current);
   };
 
-  // The new start/stop logic
   const handleStartLoading = () => {
     resetState();
     setIsLoading(true);
@@ -89,7 +87,6 @@ const Index = () => {
     setFetchedAlbumTitles([]);
     setCancelLoading(false);
 
-    // Simulate authenticating
     addLog("Authenticating with Google Photos API...");
 
     intervalRef.current = setInterval(() => {
@@ -111,14 +108,12 @@ const Index = () => {
         setProgress(40);
         addLog("Connected, beginning to retrieve albums...");
       } else if (step >= 3 && step < (3 + DEMO_ALBUMS.length)) {
-        // Simulate grabbing each album one by one.
         const albumIdx = step - 3;
         const album = DEMO_ALBUMS[albumIdx];
         setFetchedAlbumTitles(prev => [...prev, album.title]);
         addLog(`Album "${album.title}" found (${album.photoCount} photos)`);
         setProgress(Math.min(60 + albumIdx * 10, 95));
       } else if (step === 3 + DEMO_ALBUMS.length) {
-        // Done
         setProgress(100);
         addLog("Albums loaded successfully!");
         setAlbums(DEMO_ALBUMS);
@@ -132,7 +127,6 @@ const Index = () => {
     }, 700);
   };
 
-  // Handle stop/cancel loading
   const handleStopLoading = () => {
     setCancelLoading(true);
     setIsLoading(false);
@@ -140,7 +134,6 @@ const Index = () => {
     addLog("Stopped album loading.");
   };
 
-  // Clean up interval on unmount
   useEffect(() => {
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
@@ -197,7 +190,7 @@ const Index = () => {
                 onClick={handleStopLoading}
                 className="flex items-center gap-1"
               >
-                <Stop className="h-4 w-4" /> Stop
+                <StopCircle className="h-4 w-4" /> Stop
               </Button>
             ) : (
               <Button 
@@ -246,7 +239,6 @@ const Index = () => {
                 </div>
               </AlertDescription>
             </Alert>
-            {/* Real-time text list of album names as they are found */}
             <div className="bg-gray-50 rounded p-4">
               <h4 className="font-medium mb-2">Albums Being Grabbed:</h4>
               {fetchedAlbumTitles.length > 0 ? (
