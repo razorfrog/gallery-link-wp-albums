@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -6,7 +5,7 @@ import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { AlbumCard } from "@/components/AlbumCard";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
-import { InfoIcon, RefreshCw } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 
 type Album = {
   id: number;
@@ -47,16 +46,13 @@ const Index = () => {
     setAlbums([]);
   };
   
-  // Mock function to simulate loading albums
   const handleLoadAlbums = () => {
-    // Reset state before starting
     resetState();
     
     setIsLoading(true);
     
     addLog("Starting to load albums...");
     
-    // Simulate API call with progress updates
     let progressValue = 0;
     const progressInterval = setInterval(() => {
       progressValue += 5;
@@ -81,7 +77,6 @@ const Index = () => {
       }
     }, 125);
     
-    // Safety timeout to ensure loading eventually completes even if there's an error
     setTimeout(() => {
       if (isLoading && progress < 100) {
         clearInterval(progressInterval);
@@ -125,7 +120,6 @@ const Index = () => {
   };
 
   useEffect(() => {
-    // Clean up interval on component unmount
     return () => {
       resetState();
     };
@@ -175,7 +169,6 @@ const Index = () => {
         </div>
       </div>
       
-      {/* Demo Album Section */}
       <div className="max-w-5xl w-full mx-auto bg-white rounded-lg shadow-lg p-6">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-bold">Albums Demo</h2>
