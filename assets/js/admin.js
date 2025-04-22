@@ -387,10 +387,10 @@ jQuery(document).ready(function($) {
                           .addClass('button-secondary')
                           .text(wpglAdmin.i18n ? wpglAdmin.i18n.imported : 'Imported');
                     
-                    // EXTENDED DEBUGGING: Log all date information from the response
-                    console.log('WP Gallery Link: Album Date Debug Information:');
-                    console.log('- Raw Album Date:', response.data.album_date_raw || 'Not provided');
-                    console.log('- Saved Album Date:', response.data.album_date_saved || 'Not provided');
+                    // Log all date information from the response
+                    console.log('%c--- ALBUM DATE DEBUG INFO ---', 'background:#3498db; color:white; padding:5px; font-weight:bold');
+                    console.log('Raw Album Date:', response.data.album_date_raw || 'Not provided');
+                    console.log('Saved Album Date:', response.data.album_date_saved || 'Not provided');
                     console.table({
                         'Album ID': albumId,
                         'Album Title': response.data.album_title || 'Unknown',
@@ -398,34 +398,35 @@ jQuery(document).ready(function($) {
                         'Raw Date': response.data.album_date_raw || 'Not provided',
                         'Saved Date': response.data.album_date_saved || 'Not provided'
                     });
+                    console.log('%c--- END DATE DEBUG INFO ---', 'background:#3498db; color:white; padding:5px; font-weight:bold');
                     
-                    // Create a debug display on the page
+                    // CRITICAL FIX: Don't redirect, show debug info on the page instead
                     const debugHtml = `
-                        <div class="wpgl-debug-info" style="margin-top: 20px; padding: 10px; background: #f1f1f1; border-left: 4px solid #0073aa;">
-                            <h3>Album Import Debug Info</h3>
+                        <div class="wpgl-debug-info" style="margin-top: 20px; padding: 15px; background: #f1f1f1; border-left: 5px solid #e74c3c; position:fixed; top:50px; right:20px; width:400px; z-index:9999; box-shadow:0 0 15px rgba(0,0,0,0.2);">
+                            <h3 style="margin-top:0;">Album Import Debug Info</h3>
                             <p><strong>Album ID:</strong> ${albumId}</p>
                             <p><strong>Post ID:</strong> ${response.data.post_id || 'Unknown'}</p>
-                            <p><strong>Raw Creation Date:</strong> ${response.data.album_date_raw || 'Not provided'}</p>
-                            <p><strong>Saved Date:</strong> ${response.data.album_date_saved || 'Not provided'}</p>
-                            <p>Please check your PHP error log for complete API response details.</p>
+                            <p><strong>Raw Creation Date:</strong> <span style="background:#ffe6cc; padding:3px;">${response.data.album_date_raw || 'Not provided'}</span></p>
+                            <p><strong>Saved Date:</strong> <span style="background:#d4edda; padding:3px;">${response.data.album_date_saved || 'Not provided'}</span></p>
+                            <div style="margin-top:10px;">
+                                <a href="${response.data.edit_url}" class="button button-primary">Edit Album</a>
+                                <button class="button dismiss-debug" style="margin-left:10px;">Dismiss</button>
+                            </div>
                         </div>
                     `;
                     
-                    // Add the debug info to the page
-                    $('.wpgl-albums-container').prepend(debugHtml);
+                    // Remove any existing debug info
+                    $('.wpgl-debug-info').remove();
                     
-                    // Only redirect if debug_redirect is not set to 'false'
-                    if (response.data && response.data.post_id && response.data.debug_redirect !== 'false') {
-                        // Add a short delay before redirect to show the success message
-                        setTimeout(function() {
-                            window.location.href = response.data.edit_url || 
-                                `post.php?post=${response.data.post_id}&action=edit`;
-                        }, 1000);
-                    } else {
-                        // Show success message without redirecting
-                        alert(wpglAdmin.i18n ? wpglAdmin.i18n.import_success + " (Debug mode: no redirect)" : 
-                              'Album imported successfully! (Debug mode: no redirect)');
-                    }
+                    // Add the debug info to the page
+                    $('body').append(debugHtml);
+                    
+                    // Handle debug info dismissal
+                    $('.dismiss-debug').on('click', function() {
+                        $('.wpgl-debug-info').fadeOut(300, function() {
+                            $(this).remove();
+                        });
+                    });
                 } else {
                     const errorMsg = response.data && response.data.message ? response.data.message : 'Unknown error';
                     alert(wpglAdmin.i18n ? `${wpglAdmin.i18n.import_error} ${errorMsg}` : `Import error: ${errorMsg}`);
@@ -676,6 +677,13 @@ jQuery(document).ready(function($) {
         // Log all import buttons that exist on page load
         $('.wpgl-import-album').each(function() {
             console.log('Found import button with ID:', $(this).data('id'));
+        });
+        
+        // Add a document ready handler for debug info dismissal (globally)
+        $(document).on('click', '.dismiss-debug', function() {
+            $('.wpgl-debug-info').fadeOut(300, function() {
+                $(this).remove();
+            });
         });
     });
 });
