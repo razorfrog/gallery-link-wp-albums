@@ -300,7 +300,8 @@ class WP_Gallery_Link_Google_API {
                     'id' => $album['id'],
                     'title' => $album['title'],
                     'mediaItemsCount' => isset($album['mediaItemsCount']) ? $album['mediaItemsCount'] : 0,
-                    'coverPhotoBaseUrl' => isset($album['coverPhotoBaseUrl']) ? $album['coverPhotoBaseUrl'] : ''
+                    'coverPhotoBaseUrl' => isset($album['coverPhotoBaseUrl']) ? $album['coverPhotoBaseUrl'] : '',
+                    'creationTime' => isset($album['mediaItemsContainerInfo']['creationTime']) ? $album['mediaItemsContainerInfo']['creationTime'] : ''
                 );
             }
         } else {
@@ -439,7 +440,8 @@ class WP_Gallery_Link_Google_API {
         wp_gallery_link()->log('Album details fetched successfully', 'debug', array(
             'album_id' => $album_id,
             'title' => $body['title'],
-            'media_count' => isset($body['mediaItemsCount']) ? $body['mediaItemsCount'] : 0
+            'media_count' => isset($body['mediaItemsCount']) ? $body['mediaItemsCount'] : 0,
+            'creation_time' => isset($body['mediaItemsContainerInfo']['creationTime']) ? $body['mediaItemsContainerInfo']['creationTime'] : 'Not available'
         ));
         
         // Return album details with creation date included if available
@@ -450,7 +452,7 @@ class WP_Gallery_Link_Google_API {
             'coverPhotoBaseUrl' => isset($body['coverPhotoBaseUrl']) ? $body['coverPhotoBaseUrl'] : '',
             'productUrl' => isset($body['productUrl']) ? $body['productUrl'] : '',
             'isWriteable' => isset($body['isWriteable']) ? $body['isWriteable'] : false,
-            'creationTime' => isset($body['creationTime']) ? $body['creationTime'] : ''
+            'creationTime' => isset($body['mediaItemsContainerInfo']['creationTime']) ? $body['mediaItemsContainerInfo']['creationTime'] : ''
         );
     }
     
@@ -492,6 +494,9 @@ class WP_Gallery_Link_Google_API {
         // Save all metadata with proper prefix
         update_post_meta($post_id, '_gphoto_album_id', $album_data['id']);
         
+        // Set default order value of 0
+        update_post_meta($post_id, '_gphoto_album_order', 0);
+        
         if (!empty($album_data['productUrl'])) {
             update_post_meta($post_id, '_gphoto_album_url', $album_data['productUrl']);
         }
@@ -507,7 +512,7 @@ class WP_Gallery_Link_Google_API {
             update_post_meta($post_id, '_gphoto_photo_count', intval($album_data['mediaItemsCount']));
         }
         
-        // Handle creation date properly
+        // Handle creation date properly - check mediaItemsContainerInfo first
         if (!empty($album_data['creationTime'])) {
             $date = date('Y-m-d', strtotime($album_data['creationTime']));
             update_post_meta($post_id, '_gphoto_album_date', $date);
@@ -522,7 +527,8 @@ class WP_Gallery_Link_Google_API {
                 'album_id' => $album_data['id'],
                 'album_title' => $album_data['title'], // Log the actual title
                 'album_url' => !empty($album_data['productUrl']) ? $album_data['productUrl'] : '',
-                'album_date' => !empty($album_data['creationTime']) ? date('Y-m-d', strtotime($album_data['creationTime'])) : date('Y-m-d')
+                'album_date' => !empty($album_data['creationTime']) ? date('Y-m-d', strtotime($album_data['creationTime'])) : date('Y-m-d'),
+                'album_order' => 0 // Log the default order
             )
         ));
 
