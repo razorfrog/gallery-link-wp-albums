@@ -1,3 +1,4 @@
+
 <?php
 /**
  * Admin settings and functionality
@@ -289,12 +290,14 @@ class WP_Gallery_Link_Admin {
                     <p>
                         <?php _e('Select albums to import from your Google Photos account. You can then edit them, assign categories, and customize their display.', 'wp-gallery-link'); ?>
                     </p>
-                    <button id="wpgl-start-loading" class="button button-primary">
-                        <?php _e('Start Loading Albums', 'wp-gallery-link'); ?>
-                    </button>
-                    <button id="wpgl-stop-loading" class="button" style="display:none;">
-                        <?php _e('Stop Loading', 'wp-gallery-link'); ?>
-                    </button>
+                    <div class="wpgl-button-group">
+                        <button id="wpgl-start-loading" class="button button-primary wpgl-load-albums">
+                            <?php _e('Start Loading Albums', 'wp-gallery-link'); ?>
+                        </button>
+                        <button id="wpgl-stop-loading" class="button" style="display:none;">
+                            <?php _e('Stop Loading', 'wp-gallery-link'); ?>
+                        </button>
+                    </div>
                 </div>
 
                 <div class="wpgl-loading-container" style="display: none;">
@@ -309,12 +312,17 @@ class WP_Gallery_Link_Admin {
                     </div>
                 </div>
 
-                <div class="wpgl-albums-log-container" style="display:none;">
-                    <h4><?php _e('Real-time Album Titles', 'wp-gallery-link'); ?></h4>
-                    <ul id="wpgl-albums-title-list" style="max-height:200px;overflow:auto;margin:0;padding-left:1em;"></ul>
+                <div class="wpgl-loading-log-container" style="margin-top:20px; display: none;">
+                    <h3><?php _e('Loading Log', 'wp-gallery-link'); ?></h3>
+                    <div class="wpgl-loading-log" style="max-height:200px; overflow-y:auto; border:1px solid #ddd; padding:10px; background:#f9f9f9;"></div>
                 </div>
 
-                <div class="wpgl-albums-container" style="display: none;">
+                <div class="wpgl-albums-log-container" style="margin-top:20px; display:none;">
+                    <h3><?php _e('Albums Being Found', 'wp-gallery-link'); ?></h3>
+                    <ul id="wpgl-albums-title-list" style="max-height:200px;overflow:auto;margin:0;padding-left:1em; border:1px solid #ddd; padding:10px; background:#f9f9f9;"></ul>
+                </div>
+
+                <div class="wpgl-albums-container" style="display: none; margin-top: 20px;">
                     <h2><?php _e('Available Albums', 'wp-gallery-link'); ?></h2>
                     <div class="wpgl-albums-grid"></div>
                 </div>

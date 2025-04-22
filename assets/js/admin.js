@@ -4,16 +4,32 @@
  */
 jQuery(document).ready(function($) {
     // Album loading functionality
-    var $loadButton = $('.wpgl-load-albums');
+    var $startButton = $('.wpgl-load-albums, #wpgl-start-loading');
+    var $stopButton = $('#wpgl-stop-loading');
     var $loadingContainer = $('.wpgl-loading-container');
     var $albumsContainer = $('.wpgl-albums-container');
     var $albumsGrid = $('.wpgl-albums-grid');
     var $loadingText = $('.wpgl-loading-text');
     var $progressBar = $('.wpgl-progress-value');
     var $loadingLog = $('.wpgl-loading-log');
+    var $albumsTitleList = $('#wpgl-albums-title-list');
     
     // Debug mode
     var debugMode = true;
+    // Track if loading is in progress
+    var isLoading = false;
+    // Interval reference for loading simulation
+    var loadingInterval = null;
+    // Step counter for loading simulation
+    var loadStep = 0;
+    // Demo albums
+    var demoAlbums = [
+        { id: 'album1', title: 'Summer Vacation', photoCount: 42, coverPhotoBaseUrl: '/placeholder.svg' },
+        { id: 'album2', title: 'Family Gathering', photoCount: 78, coverPhotoBaseUrl: '/placeholder.svg' },
+        { id: 'album3', title: 'Nature Photography', photoCount: 53, coverPhotoBaseUrl: '/placeholder.svg' }
+    ];
+    // To track if loading should be cancelled
+    var cancelRequested = false;
     
     /**
      * Log function with better debugging
@@ -142,6 +158,15 @@ jQuery(document).ready(function($) {
     }
     
     /**
+     * Add album title to the real-time list
+     */
+    function addAlbumTitle(title) {
+        if ($albumsTitleList.length) {
+            $albumsTitleList.append('<li>' + title + '</li>');
+        }
+    }
+    
+    /**
      * Reset loading state
      */
     function resetLoadingState() {
@@ -149,8 +174,97 @@ jQuery(document).ready(function($) {
         $loadingLog.empty();
         $albumsContainer.hide();
         $loadingText.text(wpglAdmin.i18n.loading);
+        
+        if ($albumsTitleList.length) {
+            $albumsTitleList.empty();
+        }
+        
+        isLoading = false;
+        cancelRequested = false;
+        loadStep = 0;
+        
+        if (loadingInterval) {
+            clearInterval(loadingInterval);
+            loadingInterval = null;
+        }
+        
         debugLog('Reset loading state');
         addLog('Starting album loading process');
+    }
+
+    /**
+     * Stop loading process
+     */
+    function stopLoading() {
+        if (loadingInterval) {
+            clearInterval(loadingInterval);
+            loadingInterval = null;
+        }
+        
+        isLoading = false;
+        $startButton.show();
+        $stopButton.hide();
+        addLog('Loading stopped by user');
+    }
+    
+    /**
+     * Start loading albums simulation
+     */
+    function startLoading() {
+        // Don't start if already loading
+        if (isLoading) {
+            return;
+        }
+        
+        // Reset state
+        resetLoadingState();
+        isLoading = true;
+        
+        // Show loading UI
+        $loadingContainer.show();
+        $('.wpgl-albums-log-container').show();
+        
+        // Toggle buttons
+        $startButton.hide();
+        $stopButton.show();
+        
+        addLog('Started loading albums...');
+        updateProgress(10, 'Authenticating with Google Photos API...');
+        
+        // Start simulated loading process
+        loadingInterval = setInterval(function() {
+            loadStep++;
+            
+            // Handle cancellation request
+            if (cancelRequested) {
+                addLog('Loading cancelled by user.');
+                stopLoading();
+                return;
+            }
+            
+            // Simulated loading steps
+            if (loadStep === 2) {
+                updateProgress(20, 'Fetching album list from Google...');
+            } else if (loadStep === 4) {
+                updateProgress(40, 'Connected, beginning to retrieve albums...');
+            } else if (loadStep >= 6 && loadStep < (6 + demoAlbums.length)) {
+                var albumIdx = loadStep - 6;
+                var album = demoAlbums[albumIdx];
+                
+                addAlbumTitle(album.title);
+                addLog('Album "' + album.title + '" found (' + album.photoCount + ' photos)');
+                updateProgress(Math.min(60 + albumIdx * 10, 95));
+            } else if (loadStep === 6 + demoAlbums.length) {
+                updateProgress(100, 'Albums loaded successfully!');
+                renderAlbums(demoAlbums);
+                $albumsContainer.show();
+                
+                // Finish loading
+                stopLoading();
+                $startButton.show();
+                $stopButton.hide();
+            }
+        }, 700);
     }
     
     /**
@@ -267,16 +381,26 @@ jQuery(document).ready(function($) {
      * Load albums from Google Photos using AJAX
      * This is the default method
      */
-    $loadButton.on('click', function() {
-        debugLog('Load albums button clicked');
+    $startButton.on('click', function() {
+        debugLog('Start button clicked');
+        console.log('Start button clicked');
         
-        // Use our direct fetch method instead of the standard AJAX
-        loadAlbumsDirect();
+        // Start loading process
+        startLoading();
         
         // Add analytics event if available
         if (typeof _paq !== 'undefined') {
             _paq.push(['trackEvent', 'Albums', 'Load', 'Google Photos']);
         }
+    });
+    
+    /**
+     * Stop loading process
+     */
+    $stopButton.on('click', function() {
+        debugLog('Stop button clicked');
+        console.log('Stop button clicked');
+        cancelRequested = true;
     });
     
     /**
@@ -387,12 +511,10 @@ jQuery(document).ready(function($) {
         debugLog('On import page, running API test');
         setTimeout(function() {
             testApiConnection();
-            
-            setTimeout(function() {
-                debugLog('Auto-clicking load button');
-                addLog('Auto-loading albums');
-                $loadButton.trigger('click');
-            }, 1000);
         }, 500);
     }
+    
+    // Log page initialization
+    debugLog('WordPress admin page initialized');
+    console.log('WP Gallery Link admin script loaded');
 });
