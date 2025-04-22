@@ -11,6 +11,7 @@ jQuery(document).ready(function($) {
     let albumsFound = [];
     let nextPageToken = '';
     let totalAlbums = 0;
+    let processedPageTokens = []; // Track processed page tokens to prevent duplicates
     
     /**
      * Log to console if in debug mode
@@ -91,6 +92,10 @@ jQuery(document).ready(function($) {
             <div class="wpgl-album" data-id="${album.id}">
                 <div class="wpgl-album-cover-container">
                     <img src="${coverImageUrl}" alt="${album.title}" class="wpgl-album-cover">
+                    <label class="wpgl-bulk-select">
+                        <input type="checkbox" class="wpgl-album-checkbox" data-id="${album.id}" data-title="${album.title}">
+                        <span class="wpgl-checkmark"></span>
+                    </label>
                 </div>
                 <div class="wpgl-album-info">
                     <h3 class="wpgl-album-title">${album.title}</h3>
@@ -126,6 +131,11 @@ jQuery(document).ready(function($) {
         $('.wpgl-loading-container').hide();
         $('#wpgl-stop-loading').hide();
         $('#wpgl-start-loading').show();
+        
+        // Show the bulk import controls if albums are found
+        if (albumsFound.length > 0) {
+            $('.wpgl-bulk-actions').show();
+        }
     }
     
     /**
@@ -137,11 +147,13 @@ jQuery(document).ready(function($) {
         albumsFound = [];
         nextPageToken = '';
         totalAlbums = 0;
+        processedPageTokens = [];
         
         // Clear UI elements
         $('.wpgl-loading-log').empty();
         $('#wpgl-albums-title-list').empty();
         $('.wpgl-albums-grid').empty(); // Clear the albums grid
+        $('.wpgl-bulk-actions').hide();
         updateProgress(0);
     }
     
@@ -175,6 +187,17 @@ jQuery(document).ready(function($) {
         
         if (nextPageToken) {
             data.pageToken = nextPageToken;
+            
+            // Check if we've already processed this page token to prevent duplicates
+            if (processedPageTokens.includes(nextPageToken)) {
+                addLoadingLog('Warning: Page token already processed, preventing duplicate load.');
+                isLoading = false;
+                hideLoadingUI();
+                return;
+            }
+            
+            // Add this token to processed tokens
+            processedPageTokens.push(nextPageToken);
         }
         
         addLoadingLog('Fetching albums from Google Photos API using direct HTML rendering...');
@@ -240,6 +263,23 @@ jQuery(document).ready(function($) {
                             addLoadingLog('No more albums available.');
                         } else if (!loadAllAlbums) {
                             addLoadingLog('Limited album loading completed. Click "Load Albums" again for more.');
+                            
+                            // Show "Load More" button
+                            if (!$('#wpgl-load-more').length) {
+                                $('.wpgl-button-group').append(`
+                                    <button id="wpgl-load-more" class="button">
+                                        ${wpglAdmin.i18n.load_more}
+                                    </button>
+                                `);
+                                
+                                // Setup load more handler
+                                $('#wpgl-load-more').on('click', function() {
+                                    $(this).hide();
+                                    loadAlbums();
+                                });
+                            } else {
+                                $('#wpgl-load-more').show();
+                            }
                         }
                         
                         hideLoadingUI();
@@ -343,6 +383,138 @@ jQuery(document).ready(function($) {
         });
     });
     
+    /**
+     * Handle bulk album import
+     */
+    function bulkImportAlbums() {
+        const selectedAlbums = [];
+        $('.wpgl-album-checkbox:checked').each(function() {
+            const $checkbox = $(this);
+            selectedAlbums.push({
+                id: $checkbox.data('id'),
+                title: $checkbox.data('title')
+            });
+        });
+        
+        if (selectedAlbums.length === 0) {
+            alert(wpglAdmin.i18n.no_albums_selected);
+            return;
+        }
+        
+        if (!confirm(wpglAdmin.i18n.confirm_bulk_import.replace('%d', selectedAlbums.length))) {
+            return;
+        }
+        
+        // Show bulk import progress UI
+        const $bulkProgress = $('.wpgl-bulk-progress');
+        $bulkProgress.show();
+        
+        const totalToImport = selectedAlbums.length;
+        let importedCount = 0;
+        let failedCount = 0;
+        
+        addLoadingLog(`Starting bulk import of ${totalToImport} albums...`);
+        
+        // Function to update the bulk import progress
+        function updateBulkProgress() {
+            const percent = Math.round((importedCount + failedCount) / totalToImport * 100);
+            $('.wpgl-bulk-progress-value').css('width', percent + '%');
+            $('.wpgl-bulk-progress-text').text(`${importedCount + failedCount} of ${totalToImport} (${percent}%)`);
+        }
+        
+        // Process albums one by one
+        function processNextAlbum(index) {
+            if (index >= selectedAlbums.length) {
+                // All done
+                addLoadingLog(`Bulk import completed: ${importedCount} imported, ${failedCount} failed.`);
+                alert(wpglAdmin.i18n.bulk_import_complete.replace('%d', importedCount).replace('%d', failedCount));
+                
+                // Refresh the page after a short delay
+                setTimeout(function() {
+                    window.location.href = 'edit.php?post_type=gphoto_album';
+                }, 1000);
+                return;
+            }
+            
+            const album = selectedAlbums[index];
+            addLoadingLog(`Importing album ${index+1}/${totalToImport}: "${album.title}"`);
+            
+            // Mark checkbox as in progress
+            const $checkbox = $(`.wpgl-album-checkbox[data-id="${album.id}"]`);
+            $checkbox.closest('.wpgl-album').addClass('importing');
+            
+            $.ajax({
+                url: wpglAdmin.ajaxUrl,
+                type: 'POST',
+                data: {
+                    action: 'wpgl_import_album',
+                    album_id: album.id,
+                    nonce: wpglAdmin.nonce,
+                    bulk: true  // Flag to indicate this is part of bulk import
+                },
+                success: function(response) {
+                    if (response.success) {
+                        importedCount++;
+                        $checkbox.closest('.wpgl-album').addClass('imported').removeClass('importing');
+                        addLoadingLog(`Album "${album.title}" imported successfully.`);
+                    } else {
+                        failedCount++;
+                        $checkbox.closest('.wpgl-album').addClass('failed').removeClass('importing');
+                        const errorMsg = response.data && response.data.message ? response.data.message : 'Unknown error';
+                        addLoadingLog(`Failed to import album "${album.title}": ${errorMsg}`);
+                    }
+                    
+                    updateBulkProgress();
+                    
+                    // Process next album after a short delay
+                    setTimeout(function() {
+                        processNextAlbum(index + 1);
+                    }, 500);
+                },
+                error: function(xhr, status, error) {
+                    failedCount++;
+                    $checkbox.closest('.wpgl-album').addClass('failed').removeClass('importing');
+                    addLoadingLog(`Error importing album "${album.title}": ${error}`);
+                    
+                    updateBulkProgress();
+                    
+                    // Process next album after a short delay
+                    setTimeout(function() {
+                        processNextAlbum(index + 1);
+                    }, 500);
+                }
+            });
+        }
+        
+        // Start processing albums
+        processNextAlbum(0);
+    }
+    
+    // Bulk select/deselect all
+    $(document).on('click', '#wpgl-select-all', function() {
+        const isChecked = $(this).prop('checked');
+        $('.wpgl-album-checkbox').prop('checked', isChecked);
+        updateSelectedCount();
+    });
+    
+    // Update selected count when individual checkboxes change
+    $(document).on('change', '.wpgl-album-checkbox', function() {
+        updateSelectedCount();
+    });
+    
+    // Update the selected albums count
+    function updateSelectedCount() {
+        const count = $('.wpgl-album-checkbox:checked').length;
+        $('.wpgl-selected-count').text(count);
+        
+        // Enable/disable bulk import button
+        if (count > 0) {
+            $('#wpgl-bulk-import').prop('disabled', false);
+        } else {
+            $('#wpgl-bulk-import').prop('disabled', true);
+        }
+    }
+    
     // Start loading albums button
     $('#wpgl-start-loading').on('click', function() {
         logDebug('Start loading button clicked');
@@ -361,6 +533,11 @@ jQuery(document).ready(function($) {
     $('#wpgl-stop-loading').on('click', function() {
         cancelLoading = true;
         addLoadingLog('Stopping album loading process...');
+    });
+    
+    // Bulk import button
+    $(document).on('click', '#wpgl-bulk-import', function() {
+        bulkImportAlbums();
     });
     
     // Debug button for demo loading

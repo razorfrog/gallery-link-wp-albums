@@ -1,3 +1,4 @@
+
 <?php
 /**
  * Admin settings and functionality
@@ -115,7 +116,7 @@ class WP_Gallery_Link_Admin {
             'nonce' => wp_create_nonce('wpgl_nonce'),
             'debugMode' => defined('WP_GALLERY_LINK_DEBUG') && WP_GALLERY_LINK_DEBUG,
             'demoMode' => $demo_mode,
-            'loadAllAlbums' => true,
+            'loadAllAlbums' => false, // Changed to false to enable pagination
             'i18n' => array(
                 'importing' => __('Importing...', 'wp-gallery-link'),
                 'imported' => __('Imported', 'wp-gallery-link'),
@@ -123,9 +124,15 @@ class WP_Gallery_Link_Admin {
                 'import_success' => __('Album imported successfully!', 'wp-gallery-link'),
                 'import_error' => __('Error importing album:', 'wp-gallery-link'),
                 'loading_albums' => __('Loading albums...', 'wp-gallery-link'),
-                'load_more' => __('Load more', 'wp-gallery-link'),
+                'load_more' => __('Load More Albums', 'wp-gallery-link'),
                 'no_more_albums' => __('No more albums to load.', 'wp-gallery-link'),
-                'error_loading' => __('Error loading albums:', 'wp-gallery-link')
+                'error_loading' => __('Error loading albums:', 'wp-gallery-link'),
+                'bulk_import' => __('Bulk Import', 'wp-gallery-link'),
+                'select_all' => __('Select All', 'wp-gallery-link'),
+                'no_albums_selected' => __('No albums selected. Please select at least one album.', 'wp-gallery-link'),
+                'confirm_bulk_import' => __('Are you sure you want to import %d selected albums?', 'wp-gallery-link'),
+                'bulk_import_complete' => __('Bulk import completed: %d albums imported, %d failed.', 'wp-gallery-link'),
+                'albums_selected' => __('albums selected', 'wp-gallery-link')
             )
         ));
         
@@ -377,6 +384,7 @@ class WP_Gallery_Link_Admin {
                         <button id="wpgl-stop-loading" class="button" style="display:none;">
                             <?php _e('Stop Loading', 'wp-gallery-link'); ?>
                         </button>
+                        <!-- Load More button will be added here dynamically -->
                     </div>
                 </div>
 
@@ -388,6 +396,29 @@ class WP_Gallery_Link_Admin {
                     <div class="wpgl-progress">
                         <div class="wpgl-progress-bar">
                             <div class="wpgl-progress-value" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="wpgl-bulk-actions" style="margin-top:20px; display:none;">
+                    <div class="wpgl-bulk-header">
+                        <h3><?php _e('Bulk Actions', 'wp-gallery-link'); ?></h3>
+                        <label>
+                            <input type="checkbox" id="wpgl-select-all">
+                            <?php _e('Select All Albums', 'wp-gallery-link'); ?>
+                        </label>
+                        <span class="wpgl-selection-info">
+                            <span class="wpgl-selected-count">0</span> <?php _e('albums selected', 'wp-gallery-link'); ?>
+                        </span>
+                        <button id="wpgl-bulk-import" class="button button-primary" disabled>
+                            <?php _e('Bulk Import Selected Albums', 'wp-gallery-link'); ?>
+                        </button>
+                    </div>
+                    <div class="wpgl-bulk-progress" style="display:none; margin-top:10px;">
+                        <p><?php _e('Bulk import in progress...', 'wp-gallery-link'); ?> 
+                           <span class="wpgl-bulk-progress-text">0%</span></p>
+                        <div class="wpgl-progress-bar">
+                            <div class="wpgl-bulk-progress-value" style="width: 0%"></div>
                         </div>
                     </div>
                 </div>

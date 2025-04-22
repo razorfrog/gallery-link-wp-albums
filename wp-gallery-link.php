@@ -112,6 +112,10 @@ class WP_Gallery_Link {
             $this->google_api->is_connected = function() { return false; };
             $this->google_api->get_auth_url = function() { return '#'; };
         }
+        
+        // Register AJAX handlers
+        add_action('wp_ajax_wpgl_fetch_albums', array($this, 'ajax_fetch_albums'));
+        add_action('wp_ajax_wpgl_import_album', array($this, 'ajax_import_album'));
     }
     
     /**
@@ -154,8 +158,11 @@ class WP_Gallery_Link {
         
         $this->log('WP Gallery Link: Fetching albums via AJAX', 'info');
         
+        // Check if we have a page token to properly paginate
+        $page_token = isset($_POST['pageToken']) ? sanitize_text_field($_POST['pageToken']) : '';
+        
         // For demo purposes, we'll generate more detailed sample albums
-        $sample_albums = array(
+        $all_sample_albums = array(
             array(
                 'id' => 'album1',
                 'title' => 'Sample Album 1',
@@ -206,11 +213,34 @@ class WP_Gallery_Link {
             )
         );
         
-        $this->log('WP Gallery Link: Returning ' . count($sample_albums) . ' sample albums', 'info');
+        // Add 6 more albums for the second page
+        for ($i = 7; $i <= 12; $i++) {
+            $all_sample_albums[] = array(
+                'id' => 'album' . $i,
+                'title' => 'Sample Album ' . $i,
+                'productUrl' => 'https://photos.google.com/album/sample' . $i,
+                'mediaItemsCount' => rand(5, 100),
+                'coverPhotoBaseUrl' => 'https://via.placeholder.com/200x200?text=Album' . $i,
+                'creationTime' => '2023-' . sprintf('%02d', rand(1, 12)) . '-' . sprintf('%02d', rand(1, 28)) . 'T' . rand(10, 23) . ':' . rand(10, 59) . ':00Z'
+            );
+        }
+        
+        // For pagination demonstration
+        if (empty($page_token)) {
+            // First page
+            $sample_albums = array_slice($all_sample_albums, 0, 6);
+            $next_page_token = 'page2'; // Token for the next page
+        } else {
+            // Second page
+            $sample_albums = array_slice($all_sample_albums, 6, 6);
+            $next_page_token = ''; // No more pages
+        }
+        
+        $this->log('WP Gallery Link: Returning ' . count($sample_albums) . ' sample albums for page token: ' . $page_token, 'info');
         
         wp_send_json_success(array(
             'albums' => $sample_albums,
-            'nextPageToken' => isset($_POST['pageToken']) ? '' : 'sample_token'
+            'nextPageToken' => $next_page_token
         ));
     }
     
@@ -233,7 +263,9 @@ class WP_Gallery_Link {
         }
         
         $album_id = sanitize_text_field($_POST['album_id']);
-        $this->log('WP Gallery Link: Attempting to import album ID ' . $album_id, 'info');
+        $is_bulk = isset($_POST['bulk']) && $_POST['bulk'] == true;
+        
+        $this->log('WP Gallery Link: Attempting to import album ID ' . $album_id . ($is_bulk ? ' (bulk import)' : ''), 'info');
         
         // Mock album data for testing
         $album_data = array(
@@ -266,6 +298,7 @@ class WP_Gallery_Link {
                         'post_id' => $error_data['post_id'],
                         'edit_url' => $edit_url,
                         'view_url' => get_permalink($error_data['post_id']),
+                        'status' => 'exists'
                     ));
                 } else {
                     wp_send_json_error(array('message' => $post_id->get_error_message()));
@@ -276,13 +309,22 @@ class WP_Gallery_Link {
             // Log successful album import
             $this->log('WP Gallery Link: Successfully imported album - Post ID ' . $post_id, 'info');
             
-            // Success response
-            wp_send_json_success(array(
-                'message' => __('Album imported successfully', 'wp-gallery-link'),
-                'post_id' => $post_id,
-                'edit_url' => get_edit_post_link($post_id, ''),
-                'view_url' => get_permalink($post_id),
-            ));
+            // Success response (different handling for bulk imports)
+            if ($is_bulk) {
+                wp_send_json_success(array(
+                    'message' => __('Album imported successfully', 'wp-gallery-link'),
+                    'post_id' => $post_id,
+                    'status' => 'imported'
+                ));
+            } else {
+                wp_send_json_success(array(
+                    'message' => __('Album imported successfully', 'wp-gallery-link'),
+                    'post_id' => $post_id,
+                    'edit_url' => get_edit_post_link($post_id, ''),
+                    'view_url' => get_permalink($post_id),
+                    'status' => 'imported'
+                ));
+            }
         } else {
             $this->log('WP Gallery Link: CPT class or method not available', 'error');
             if (!isset($this->cpt)) {
@@ -304,4 +346,4 @@ function wp_gallery_link() {
 }
 
 // Initialize plugin
-wp_gallery_link();
+add_action('plugins_loaded', 'wp_gallery_link');
