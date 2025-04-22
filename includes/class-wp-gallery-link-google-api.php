@@ -1,4 +1,3 @@
-
 <?php
 /**
  * Google Photos API functionality
@@ -226,7 +225,7 @@ class WP_Gallery_Link_Google_API {
         }
         
         // Get page token from request
-        $page_token = isset($_POST['page_token']) ? $_POST['page_token'] : '';
+        $page_token = isset($_POST['pageToken']) ? $_POST['pageToken'] : '';
         
         // Log that we're making the request with the current tokens
         wp_gallery_link()->log('Fetching albums with token expiring at: ' . get_option('wpgl_google_token_expires', 0), 'info');
@@ -243,6 +242,9 @@ class WP_Gallery_Link_Google_API {
         
         if (!empty($page_token)) {
             $url = add_query_arg('pageToken', $page_token, $url);
+            wp_gallery_link()->log('Using page token: ' . $page_token, 'info');
+        } else {
+            wp_gallery_link()->log('Fetching first page of albums (no page token)', 'info');
         }
         
         // Set a larger page size
@@ -267,7 +269,7 @@ class WP_Gallery_Link_Google_API {
         wp_gallery_link()->log('Album fetch raw response', 'debug', array(
             'status' => $status_code,
             'headers' => wp_remote_retrieve_headers($response),
-            'body' => wp_remote_retrieve_body($response)
+            'body_sample' => substr(wp_remote_retrieve_body($response), 0, 1000) . '...' // Log partial body to avoid huge logs
         ));
         
         // Check for API errors
@@ -305,11 +307,19 @@ class WP_Gallery_Link_Google_API {
             wp_gallery_link()->log('No albums found in response', 'warning', $body);
         }
         
+        // Check if there's a next page token and log it
+        $next_page_token = isset($body['nextPageToken']) ? $body['nextPageToken'] : '';
+        if (!empty($next_page_token)) {
+            wp_gallery_link()->log('Next page token found: ' . substr($next_page_token, 0, 10) . '...', 'info');
+        } else {
+            wp_gallery_link()->log('No next page token found - this is the last page', 'info');
+        }
+        
         // Send response
         wp_gallery_link()->log('Successfully returning ' . count($albums) . ' albums', 'info');
         wp_send_json_success(array(
             'albums' => $albums,
-            'nextPageToken' => isset($body['nextPageToken']) ? $body['nextPageToken'] : ''
+            'nextPageToken' => $next_page_token
         ));
     }
     

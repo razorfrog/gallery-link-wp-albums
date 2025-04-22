@@ -1,3 +1,4 @@
+
 jQuery(document).ready(function($) {
     'use strict';
     
@@ -11,6 +12,7 @@ jQuery(document).ready(function($) {
     let nextPageToken = '';
     let totalAlbums = 0;
     let processedPageTokens = []; // Track processed page tokens to prevent duplicates
+    let loadedAlbumIds = new Set(); // Track album IDs to prevent duplicates
     
     /**
      * Log to console if in debug mode
@@ -73,6 +75,15 @@ jQuery(document).ready(function($) {
     function renderAlbum(album) {
         logDebug('Rendering album:', album);
         console.log('Rendering album with ID:', album.id, 'and title:', album.title);
+
+        // Skip if we've already rendered this album
+        if (loadedAlbumIds.has(album.id)) {
+            logDebug('Skipping duplicate album ID:', album.id);
+            return;
+        }
+        
+        // Add to our set of loaded album IDs
+        loadedAlbumIds.add(album.id);
 
         const $albumsGrid = $('.wpgl-albums-grid');
         
@@ -146,6 +157,7 @@ jQuery(document).ready(function($) {
         nextPageToken = '';
         totalAlbums = 0;
         processedPageTokens = [];
+        loadedAlbumIds.clear(); // Clear the set of loaded album IDs
         
         // Clear UI elements
         $('.wpgl-loading-log').empty();
@@ -153,6 +165,10 @@ jQuery(document).ready(function($) {
         $('.wpgl-albums-grid').empty(); // Clear the albums grid
         $('.wpgl-bulk-actions').hide();
         updateProgress(0);
+        
+        // Remove load more button if it exists
+        $('#wpgl-load-more').remove();
+        $('#wpgl-import-all').remove();
     }
     
     /**
@@ -168,8 +184,8 @@ jQuery(document).ready(function($) {
             return;
         }
         
-        // Explicit disable demo mode for testing
-        const forceRealMode = true; // Always use real API data
+        // Force real mode - we don't want demo data
+        const forceRealMode = true;
         
         if (isLoading) {
             logDebug('Already loading albums, skipping duplicate request');
@@ -256,20 +272,38 @@ jQuery(document).ready(function($) {
                         if (!$('#wpgl-load-more').length) {
                             $('.wpgl-button-group').append(`
                                 <button id="wpgl-load-more" class="button">
-                                    ${wpglAdmin.i18n ? wpglAdmin.i18n.load_more : 'Load More'}
+                                    ${wpglAdmin.i18n ? wpglAdmin.i18n.load_more : 'Load More Albums'}
                                 </button>
                             `);
                             
                             // Setup load more handler
                             $('#wpgl-load-more').on('click', function() {
-                                $(this).hide();
+                                $(this).prop('disabled', true).text('Loading...');
                                 loadAlbums();
                             });
                         } else {
-                            $('#wpgl-load-more').show();
+                            $('#wpgl-load-more').show().prop('disabled', false).text(wpglAdmin.i18n ? wpglAdmin.i18n.load_more : 'Load More Albums');
                         }
                     } else {
                         addLoadingLog('No more albums available.');
+                        $('#wpgl-load-more').hide();
+                    }
+                    
+                    // Add "Import All" button if it doesn't exist and we have albums
+                    if (totalAlbums > 0 && !$('#wpgl-import-all').length) {
+                        $('.wpgl-bulk-actions .wpgl-bulk-header').append(`
+                            <button id="wpgl-import-all" class="button button-primary" style="margin-left: 10px;">
+                                Import All Albums
+                            </button>
+                        `);
+                        
+                        // Setup import all handler
+                        $('#wpgl-import-all').on('click', function() {
+                            // Select all albums first
+                            $('#wpgl-select-all').prop('checked', true).trigger('change');
+                            // Then trigger bulk import
+                            $('#wpgl-bulk-import').trigger('click');
+                        });
                     }
                     
                     addLoadingLog(`Finished loading ${totalAlbums} albums.`);
@@ -492,6 +526,13 @@ jQuery(document).ready(function($) {
     
     // Update selected count when individual checkboxes change
     $(document).on('change', '.wpgl-album-checkbox', function() {
+        updateSelectedCount();
+    });
+    
+    // Update selected count when the select all checkbox changes
+    $(document).on('change', '#wpgl-select-all', function() {
+        const isChecked = $(this).prop('checked');
+        $('.wpgl-album-checkbox').prop('checked', isChecked);
         updateSelectedCount();
     });
     
