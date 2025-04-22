@@ -387,25 +387,45 @@ jQuery(document).ready(function($) {
                           .addClass('button-secondary')
                           .text(wpglAdmin.i18n ? wpglAdmin.i18n.imported : 'Imported');
                     
-                    // Show the album ID and info in the console for debugging
-                    console.log('Successfully imported album:', albumId, response);
+                    // EXTENDED DEBUGGING: Log all date information from the response
+                    console.log('WP Gallery Link: Album Date Debug Information:');
+                    console.log('- Raw Album Date:', response.data.album_date_raw || 'Not provided');
+                    console.log('- Saved Album Date:', response.data.album_date_saved || 'Not provided');
+                    console.table({
+                        'Album ID': albumId,
+                        'Album Title': response.data.album_title || 'Unknown',
+                        'Post ID': response.data.post_id || 'Unknown',
+                        'Raw Date': response.data.album_date_raw || 'Not provided',
+                        'Saved Date': response.data.album_date_saved || 'Not provided'
+                    });
                     
-                    // Redirect to the edit page for the newly created album post
-                    if (response.data && response.data.post_id) {
+                    // Create a debug display on the page
+                    const debugHtml = `
+                        <div class="wpgl-debug-info" style="margin-top: 20px; padding: 10px; background: #f1f1f1; border-left: 4px solid #0073aa;">
+                            <h3>Album Import Debug Info</h3>
+                            <p><strong>Album ID:</strong> ${albumId}</p>
+                            <p><strong>Post ID:</strong> ${response.data.post_id || 'Unknown'}</p>
+                            <p><strong>Raw Creation Date:</strong> ${response.data.album_date_raw || 'Not provided'}</p>
+                            <p><strong>Saved Date:</strong> ${response.data.album_date_saved || 'Not provided'}</p>
+                            <p>Please check your PHP error log for complete API response details.</p>
+                        </div>
+                    `;
+                    
+                    // Add the debug info to the page
+                    $('.wpgl-albums-container').prepend(debugHtml);
+                    
+                    // Only redirect if debug_redirect is not set to 'false'
+                    if (response.data && response.data.post_id && response.data.debug_redirect !== 'false') {
                         // Add a short delay before redirect to show the success message
                         setTimeout(function() {
                             window.location.href = response.data.edit_url || 
                                 `post.php?post=${response.data.post_id}&action=edit`;
                         }, 1000);
                     } else {
-                        // If no post ID in response, refresh the album list page
-                        setTimeout(function() {
-                            window.location.href = 'edit.php?post_type=gphoto_album';
-                        }, 1000);
+                        // Show success message without redirecting
+                        alert(wpglAdmin.i18n ? wpglAdmin.i18n.import_success + " (Debug mode: no redirect)" : 
+                              'Album imported successfully! (Debug mode: no redirect)');
                     }
-                    
-                    // Show success message
-                    alert(wpglAdmin.i18n ? wpglAdmin.i18n.import_success : 'Album imported successfully!');
                 } else {
                     const errorMsg = response.data && response.data.message ? response.data.message : 'Unknown error';
                     alert(wpglAdmin.i18n ? `${wpglAdmin.i18n.import_error} ${errorMsg}` : `Import error: ${errorMsg}`);
