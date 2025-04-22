@@ -6,7 +6,7 @@ import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { AlbumCard } from "@/components/AlbumCard";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
-import { InfoIcon } from "lucide-react";
+import { InfoIcon, RefreshCw } from "lucide-react";
 
 type Album = {
   id: number;
@@ -40,79 +40,94 @@ const Index = () => {
     ]);
   };
   
-  // Mock function to simulate loading albums
-  const handleLoadAlbums = () => {
-    setIsLoading(true);
+  const resetState = () => {
+    setIsLoading(false);
     setProgress(0);
     setLogs([]);
+    setAlbums([]);
+  };
+  
+  // Mock function to simulate loading albums
+  const handleLoadAlbums = () => {
+    // Reset state before starting
+    resetState();
+    
+    setIsLoading(true);
     
     addLog("Starting to load albums...");
     
     // Simulate API call with progress updates
+    let progressValue = 0;
     const progressInterval = setInterval(() => {
-      setProgress(prevProgress => {
-        const newProgress = prevProgress + 5;
-        
-        if (newProgress === 25) {
-          addLog("Authenticating with Google Photos API...");
-        }
-        
-        if (newProgress === 50) {
-          addLog("Fetching album list from Google...");
-        }
-        
-        if (newProgress === 75) {
-          addLog("Processing album data...");
-        }
-        
-        if (newProgress >= 100) {
-          clearInterval(progressInterval);
-          return 100;
-        }
-        
-        return newProgress;
-      });
+      progressValue += 5;
+      setProgress(progressValue);
+      
+      if (progressValue === 25) {
+        addLog("Authenticating with Google Photos API...");
+      }
+      
+      if (progressValue === 50) {
+        addLog("Fetching album list from Google...");
+      }
+      
+      if (progressValue === 75) {
+        addLog("Processing album data...");
+      }
+      
+      if (progressValue >= 100) {
+        clearInterval(progressInterval);
+        setProgress(100);
+        finishLoading();
+      }
     }, 125);
     
-    // Simulate API response
+    // Safety timeout to ensure loading eventually completes even if there's an error
     setTimeout(() => {
-      addLog("Albums loaded successfully!");
-      setAlbums([
-        {
-          id: 1,
-          title: "Summer Vacation",
-          photoCount: 42,
-          coverImage: "/placeholder.svg",
-          date: "2024-06-15"
-        },
-        {
-          id: 2,
-          title: "Family Gathering",
-          photoCount: 78,
-          coverImage: "/placeholder.svg",
-          date: "2024-05-22"
-        },
-        {
-          id: 3,
-          title: "Nature Photography",
-          photoCount: 53,
-          coverImage: "/placeholder.svg",
-          date: "2024-04-10"
-        }
-      ]);
-      setIsLoading(false);
-      toast({
-        title: "Albums Loaded",
-        description: "Successfully loaded 3 albums",
-      });
-    }, 3000);
+      if (isLoading && progress < 100) {
+        clearInterval(progressInterval);
+        setProgress(100);
+        addLog("Loading timed out, but we'll show some albums anyway");
+        finishLoading();
+      }
+    }, 5000);
+  };
+
+  const finishLoading = () => {
+    addLog("Albums loaded successfully!");
+    setAlbums([
+      {
+        id: 1,
+        title: "Summer Vacation",
+        photoCount: 42,
+        coverImage: "/placeholder.svg",
+        date: "2024-06-15"
+      },
+      {
+        id: 2,
+        title: "Family Gathering",
+        photoCount: 78,
+        coverImage: "/placeholder.svg",
+        date: "2024-05-22"
+      },
+      {
+        id: 3,
+        title: "Nature Photography",
+        photoCount: 53,
+        coverImage: "/placeholder.svg",
+        date: "2024-04-10"
+      }
+    ]);
+    setIsLoading(false);
+    toast({
+      title: "Albums Loaded",
+      description: "Successfully loaded 3 albums",
+    });
   };
 
   useEffect(() => {
     // Clean up interval on component unmount
     return () => {
-      setProgress(0);
-      setLogs([]);
+      resetState();
     };
   }, []);
 
@@ -164,19 +179,30 @@ const Index = () => {
       <div className="max-w-5xl w-full mx-auto bg-white rounded-lg shadow-lg p-6">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-bold">Albums Demo</h2>
-          <Button 
-            onClick={handleLoadAlbums} 
-            disabled={isLoading}
-          >
-            {isLoading ? "Loading..." : "Load Albums"}
-          </Button>
+          <div className="flex gap-2">
+            {isLoading && (
+              <Button 
+                variant="outline"
+                onClick={resetState}
+                className="flex items-center gap-1"
+              >
+                <RefreshCw className="h-4 w-4" /> Reset
+              </Button>
+            )}
+            <Button 
+              onClick={handleLoadAlbums} 
+              disabled={isLoading}
+            >
+              {isLoading ? "Loading..." : "Load Albums"}
+            </Button>
+          </div>
         </div>
         
         {isLoading && (
           <div className="space-y-4 mb-6">
             <div className="flex items-center justify-between mb-2">
               <p>Loading albums...</p>
-              <span className="text-sm text-gray-500">{progress}%</span>
+              <span className="text-sm font-bold text-gray-500">{progress}%</span>
             </div>
             <Progress value={progress} className="h-2" />
             
@@ -185,12 +211,16 @@ const Index = () => {
               <AlertTitle>Loading Status Log</AlertTitle>
               <AlertDescription>
                 <div className="mt-2 max-h-40 overflow-y-auto border rounded-md p-2 bg-white">
-                  {logs.map((log) => (
-                    <div key={log.id} className="text-sm py-1 border-b border-gray-100 last:border-0">
-                      <span className="text-gray-500 mr-2">[{log.timestamp}]</span>
-                      {log.message}
-                    </div>
-                  ))}
+                  {logs.length > 0 ? (
+                    logs.map((log) => (
+                      <div key={log.id} className="text-sm py-1 border-b border-gray-100 last:border-0">
+                        <span className="text-gray-500 mr-2">[{log.timestamp}]</span>
+                        {log.message}
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-sm py-1 text-gray-500">No logs yet...</div>
+                  )}
                 </div>
               </AlertDescription>
             </Alert>
