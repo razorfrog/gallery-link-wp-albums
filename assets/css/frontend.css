@@ -165,8 +165,22 @@
     color: #666;
 }
 
-/* Instead of container queries, use a media query targeting small screens but
-   with additional specific styling targeting narrow containers */
+/* Target narrow album containers specifically */
+/* For all 1-column and 2-column layouts */
+.wpgl-columns-1 .wpgl-album .wpgl-album-meta,
+.wpgl-columns-2 .wpgl-album .wpgl-album-meta {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+}
+
+.wpgl-columns-1 .wpgl-album .wpgl-album-meta > *,
+.wpgl-columns-2 .wpgl-album .wpgl-album-meta > * {
+    width: 100%;
+    margin-bottom: 2px;
+}
+
+/* For larger column layouts but on small screens */
 @media (max-width: 576px) {
     .wpgl-album-grid .wpgl-album .wpgl-album-meta {
         flex-direction: column;
@@ -180,18 +194,14 @@
     }
 }
 
-/* Also add specific styles for narrow columns regardless of screen size */
-.wpgl-columns-1 .wpgl-album .wpgl-album-meta,
-.wpgl-columns-2 .wpgl-album .wpgl-album-meta {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 2px;
-}
-
-.wpgl-columns-1 .wpgl-album .wpgl-album-meta > *,
-.wpgl-columns-2 .wpgl-album .wpgl-album-meta > * {
-    width: 100%;
-    margin-bottom: 2px;
+/* For 3+ column layouts on wider screens - these will be narrow enough to need stacking */
+@media (min-width: 577px) {
+    .wpgl-columns-3 .wpgl-album-inner,
+    .wpgl-columns-4 .wpgl-album-inner,
+    .wpgl-columns-5 .wpgl-album-inner,
+    .wpgl-columns-6 .wpgl-album-inner {
+        /* Use a Javascript approach to detect narrow containers and add a class */
+    }
 }
 
 .wpgl-album-categories {
@@ -206,4 +216,16 @@
     background-color: #f9f9f9;
     border-radius: 4px;
     color: #666;
+}
+
+/* Special class that JS will apply to elements under 300px */
+.wpgl-narrow-container .wpgl-album-meta {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+}
+
+.wpgl-narrow-container .wpgl-album-meta > * {
+    width: 100%;
+    margin-bottom: 2px;
 }

@@ -1,4 +1,3 @@
-
 <?php
 /**
  * Shortcode functionality
@@ -23,6 +22,29 @@ class WP_Gallery_Link_Shortcode {
             array(),
             WP_GALLERY_LINK_VERSION
         );
+
+        // Add inline script for detecting narrow containers
+        wp_add_inline_script('jquery', '
+            jQuery(document).ready(function($) {
+                function checkAlbumWidth() {
+                    $(".wpgl-album-inner").each(function() {
+                        if ($(this).width() < 300) {
+                            $(this).addClass("wpgl-narrow-container");
+                        } else {
+                            $(this).removeClass("wpgl-narrow-container");
+                        }
+                    });
+                }
+                
+                // Check on page load
+                checkAlbumWidth();
+                
+                // Check on window resize
+                $(window).on("resize", function() {
+                    checkAlbumWidth();
+                });
+            });
+        ');
     }
     
     /**
