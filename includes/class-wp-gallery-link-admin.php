@@ -1,8 +1,13 @@
-
 <?php
 /**
  * Admin settings and functionality
  */
+
+// If this file is called directly, abort.
+if (!defined('WPINC')) {
+    die;
+}
+
 class WP_Gallery_Link_Admin {
     
     /**
@@ -12,6 +17,10 @@ class WP_Gallery_Link_Admin {
         add_action('admin_menu', array($this, 'add_admin_menu'));
         add_action('admin_enqueue_scripts', array($this, 'enqueue_scripts'));
         add_action('admin_init', array($this, 'register_settings'));
+        
+        if (WP_GALLERY_LINK_DEBUG) {
+            error_log('WP Gallery Link Admin: Initialized');
+        }
     }
     
     /**
@@ -45,6 +54,22 @@ class WP_Gallery_Link_Admin {
             'wp-gallery-link-import',
             array($this, 'render_import_page')
         );
+        
+        // Add debug page if debug mode is enabled
+        if (defined('WP_GALLERY_LINK_DEBUG') && WP_GALLERY_LINK_DEBUG) {
+            add_submenu_page(
+                'wp-gallery-link',
+                __('Debug', 'wp-gallery-link'),
+                __('Debug', 'wp-gallery-link'),
+                'manage_options',
+                'wp-gallery-link-debug',
+                array($this, 'render_debug_page')
+            );
+        }
+        
+        if (WP_GALLERY_LINK_DEBUG) {
+            error_log('WP Gallery Link Admin: Menu items added');
+        }
     }
     
     /**
@@ -72,10 +97,9 @@ class WP_Gallery_Link_Admin {
         
         wp_localize_script('wp-gallery-link-admin', 'wpglAdmin', array(
             'ajaxUrl' => admin_url('admin-ajax.php'),
-            'nonce' => wp_create_nonce('wpgl_debug'),
+            'nonce' => wp_create_nonce('wpgl_nonce'),
             'version' => WP_GALLERY_LINK_VERSION,
             'debugMode' => WP_GALLERY_LINK_DEBUG,
-            'loadAllAlbums' => true, // Set to load all albums, not just batches
             'i18n' => array(
                 'importing' => __('Importing...', 'wp-gallery-link'),
                 'imported' => __('Imported', 'wp-gallery-link'),
@@ -89,6 +113,10 @@ class WP_Gallery_Link_Admin {
                 'no_cover' => __('No Cover Image', 'wp-gallery-link')
             )
         ));
+        
+        if (WP_GALLERY_LINK_DEBUG) {
+            error_log('WP Gallery Link Admin: Scripts and styles enqueued for ' . $hook);
+        }
     }
     
     /**
@@ -353,4 +381,235 @@ class WP_Gallery_Link_Admin {
         </script>
         <?php
     }
+    
+    /**
+     * Render debug page
+     */
+    public function render_debug_page() {
+        if (!current_user_can('manage_options')) {
+            return;
+        }
+        
+        ?>
+        <div class="wrap">
+            <h1><?php _e('Debug Information', 'wp-gallery-link'); ?></h1>
+            
+            <div class="wpgl-debug-container">
+                <h2><?php _e('Plugin Configuration', 'wp-gallery-link'); ?></h2>
+                <table class="widefat">
+                    <tbody>
+                        <tr>
+                            <td><strong><?php _e('Plugin Version', 'wp-gallery-link'); ?></strong></td>
+                            <td><?php echo WP_GALLERY_LINK_VERSION; ?></td>
+                        </tr>
+                        <tr>
+                            <td><strong><?php _e('Debug Mode', 'wp-gallery-link'); ?></strong></td>
+                            <td><?php echo WP_GALLERY_LINK_DEBUG ? 'Enabled' : 'Disabled'; ?></td>
+                        </tr>
+                        <tr>
+                            <td><strong><?php _e('Plugin Path', 'wp-gallery-link'); ?></strong></td>
+                            <td><?php echo WP_GALLERY_LINK_PATH; ?></td>
+                        </tr>
+                        <tr>
+                            <td><strong><?php _e('Plugin URL', 'wp-gallery-link'); ?></strong></td>
+                            <td><?php echo WP_GALLERY_LINK_URL; ?></td>
+                        </tr>
+                    </tbody>
+                </table>
+                
+                <h2><?php _e('WordPress Environment', 'wp-gallery-link'); ?></h2>
+                <table class="widefat">
+                    <tbody>
+                        <tr>
+                            <td><strong><?php _e('WordPress Version', 'wp-gallery-link'); ?></strong></td>
+                            <td><?php echo get_bloginfo('version'); ?></td>
+                        </tr>
+                        <tr>
+                            <td><strong><?php _e('PHP Version', 'wp-gallery-link'); ?></strong></td>
+                            <td><?php echo phpversion(); ?></td>
+                        </tr>
+                        <tr>
+                            <td><strong><?php _e('Active Theme', 'wp-gallery-link'); ?></strong></td>
+                            <td><?php echo wp_get_theme()->get('Name'); ?> (<?php echo wp_get_theme()->get('Version'); ?>)</td>
+                        </tr>
+                    </tbody>
+                </table>
+                
+                <h2><?php _e('Post Type Status', 'wp-gallery-link'); ?></h2>
+                <?php
+                $album_args = array(
+                    'post_type' => 'gphoto_album',
+                    'posts_per_page' => -1,
+                );
+                $albums = get_posts($album_args);
+                ?>
+                <table class="widefat">
+                    <tbody>
+                        <tr>
+                            <td><strong><?php _e('Album Post Type', 'wp-gallery-link'); ?></strong></td>
+                            <td>gphoto_album</td>
+                        </tr>
+                        <tr>
+                            <td><strong><?php _e('Registered Albums', 'wp-gallery-link'); ?></strong></td>
+                            <td><?php echo count($albums); ?></td>
+                        </tr>
+                    </tbody>
+                </table>
+                
+                <?php if (count($albums) > 0): ?>
+                <h2><?php _e('Albums in Database', 'wp-gallery-link'); ?></h2>
+                <table class="widefat">
+                    <thead>
+                        <tr>
+                            <th><?php _e('ID', 'wp-gallery-link'); ?></th>
+                            <th><?php _e('Title', 'wp-gallery-link'); ?></th>
+                            <th><?php _e('Google Photos ID', 'wp-gallery-link'); ?></th>
+                            <th><?php _e('Status', 'wp-gallery-link'); ?></th>
+                            <th><?php _e('Date', 'wp-gallery-link'); ?></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach($albums as $album): ?>
+                        <tr>
+                            <td><?php echo $album->ID; ?></td>
+                            <td>
+                                <a href="<?php echo get_edit_post_link($album->ID); ?>"><?php echo $album->post_title; ?></a>
+                            </td>
+                            <td><?php echo get_post_meta($album->ID, 'wpgl_album_id', true); ?></td>
+                            <td><?php echo $album->post_status; ?></td>
+                            <td><?php echo get_the_date('', $album->ID); ?></td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+                <?php endif; ?>
+                
+                <h2><?php _e('Check for Post Type Mismatches', 'wp-gallery-link'); ?></h2>
+                <?php
+                global $wpdb;
+                $mismatched_albums = $wpdb->get_results(
+                    "SELECT ID, post_title, post_type 
+                     FROM {$wpdb->posts} 
+                     WHERE post_type = 'wp_gallery_album'"
+                );
+                ?>
+                <?php if (count($mismatched_albums) > 0): ?>
+                <div class="notice notice-error">
+                    <p>
+                        <?php 
+                        printf(
+                            _n(
+                                'Found %d album with incorrect post type (wp_gallery_album). These need to be fixed.',
+                                'Found %d albums with incorrect post type (wp_gallery_album). These need to be fixed.',
+                                count($mismatched_albums),
+                                'wp-gallery-link'
+                            ),
+                            count($mismatched_albums)
+                        );
+                        ?>
+                    </p>
+                    <form method="post" action="<?php echo admin_url('admin-post.php'); ?>">
+                        <input type="hidden" name="action" value="wpgl_fix_post_types" />
+                        <?php wp_nonce_field('wpgl_fix_post_types', 'wpgl_nonce'); ?>
+                        <p>
+                            <button type="submit" class="button button-primary">
+                                <?php _e('Fix Post Types', 'wp-gallery-link'); ?>
+                            </button>
+                        </p>
+                    </form>
+                </div>
+                <table class="widefat">
+                    <thead>
+                        <tr>
+                            <th><?php _e('ID', 'wp-gallery-link'); ?></th>
+                            <th><?php _e('Title', 'wp-gallery-link'); ?></th>
+                            <th><?php _e('Current Post Type', 'wp-gallery-link'); ?></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach($mismatched_albums as $album): ?>
+                        <tr>
+                            <td><?php echo $album->ID; ?></td>
+                            <td><?php echo $album->post_title; ?></td>
+                            <td><?php echo $album->post_type; ?></td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+                <?php else: ?>
+                <div class="notice notice-success">
+                    <p><?php _e('No post type mismatches found.', 'wp-gallery-link'); ?></p>
+                </div>
+                <?php endif; ?>
+                
+                <h2><?php _e('System Information', 'wp-gallery-link'); ?></h2>
+                <textarea readonly="readonly" class="large-text code" rows="10"><?php
+                    echo 'WordPress Version: ' . get_bloginfo('version') . "\n";
+                    echo 'PHP Version: ' . phpversion() . "\n";
+                    echo 'Server Software: ' . $_SERVER['SERVER_SOFTWARE'] . "\n";
+                    echo 'User Agent: ' . $_SERVER['HTTP_USER_AGENT'] . "\n";
+                    echo 'WP Memory Limit: ' . WP_MEMORY_LIMIT . "\n";
+                    echo 'WP Debug Mode: ' . (defined('WP_DEBUG') && WP_DEBUG ? 'Enabled' : 'Disabled') . "\n";
+                    echo 'WP Debug Log: ' . (defined('WP_DEBUG_LOG') && WP_DEBUG_LOG ? 'Enabled' : 'Disabled') . "\n";
+                    echo 'WP Debug Display: ' . (defined('WP_DEBUG_DISPLAY') && WP_DEBUG_DISPLAY ? 'Enabled' : 'Disabled') . "\n";
+                    echo 'PHP Post Max Size: ' . ini_get('post_max_size') . "\n";
+                    echo 'PHP Upload Max Size: ' . ini_get('upload_max_filesize') . "\n";
+                    echo 'PHP Max Execution Time: ' . ini_get('max_execution_time') . "\n";
+                    echo 'PHP Max Input Vars: ' . ini_get('max_input_vars') . "\n";
+                ?></textarea>
+            </div>
+        </div>
+        <?php
+    }
+}
+
+// Add action handler for fixing post types
+add_action('admin_post_wpgl_fix_post_types', 'wpgl_fix_post_types_handler');
+
+/**
+ * Handler for the fix post types action
+ */
+function wpgl_fix_post_types_handler() {
+    // Check permissions
+    if (!current_user_can('manage_options')) {
+        wp_die(__('You do not have sufficient permissions to access this page.', 'wp-gallery-link'));
+    }
+    
+    // Verify nonce
+    if (!isset($_POST['wpgl_nonce']) || !wp_verify_nonce($_POST['wpgl_nonce'], 'wpgl_fix_post_types')) {
+        wp_die(__('Security check failed.', 'wp-gallery-link'));
+    }
+    
+    // Get posts with incorrect post type
+    global $wpdb;
+    $mismatched_albums = $wpdb->get_results(
+        "SELECT ID, post_title 
+         FROM {$wpdb->posts} 
+         WHERE post_type = 'wp_gallery_album'"
+    );
+    
+    $updated_count = 0;
+    foreach ($mismatched_albums as $album) {
+        // Update post type
+        $result = $wpdb->update(
+            $wpdb->posts,
+            ['post_type' => 'gphoto_album'],
+            ['ID' => $album->ID]
+        );
+        
+        if ($result !== false) {
+            $updated_count++;
+        }
+    }
+    
+    // Redirect back to debug page with status
+    wp_redirect(add_query_arg(
+        array(
+            'page' => 'wp-gallery-link-debug',
+            'updated' => $updated_count,
+            'total' => count($mismatched_albums)
+        ),
+        admin_url('admin.php')
+    ));
+    exit;
 }

@@ -28,4 +28,10 @@ if (WP_GALLERY_LINK_DEBUG) {
 
 // Include the necessary files - make sure the classes are loaded before the main plugin file
 require_once WP_GALLERY_LINK_PATH . 'includes/class-wp-gallery-link-cpt.php';
+require_once WP_GALLERY_LINK_PATH . 'includes/class-wp-gallery-link-admin.php'; // Include admin class
 require_once WP_GALLERY_LINK_PATH . 'wp-gallery-link.php';
+
+// Initialize admin functionality
+if (is_admin()) {
+    $wp_gallery_link_admin = new WP_Gallery_Link_Admin();
+}

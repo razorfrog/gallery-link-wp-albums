@@ -29,6 +29,17 @@ class WP_Gallery_Link {
     private $cpt;
     
     /**
+     * Get instance of main plugin class
+     */
+    public static function get_instance() {
+        static $instance = null;
+        if (null === $instance) {
+            $instance = new self();
+        }
+        return $instance;
+    }
+    
+    /**
      * Initialize the plugin
      */
     public function __construct() {
@@ -132,5 +143,12 @@ class WP_Gallery_Link {
     }
 }
 
+/**
+ * Helper function to access the main plugin instance
+ */
+function wp_gallery_link() {
+    return WP_Gallery_Link::get_instance();
+}
+
 // Initialize plugin
-new WP_Gallery_Link();
+wp_gallery_link();
