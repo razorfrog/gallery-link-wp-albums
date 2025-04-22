@@ -1,3 +1,4 @@
+
 jQuery(document).ready(function($) {
     'use strict';
     
@@ -153,7 +154,7 @@ jQuery(document).ready(function($) {
         
         const data = {
             action: 'wpgl_fetch_albums',
-            nonce: wpglAdmin.nonce
+            nonce: wpglAdmin.nonce // Use the nonce from wpglAdmin
         };
         
         if (nextPageToken) {
@@ -274,7 +275,7 @@ jQuery(document).ready(function($) {
             data: {
                 action: 'wpgl_import_album',
                 album_id: albumId,
-                nonce: wpglAdmin.nonce
+                nonce: wpglAdmin.nonce // Use the nonce from wpglAdmin
             },
             success: function(response) {
                 logDebug('Album import response:', response);

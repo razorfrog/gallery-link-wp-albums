@@ -1,4 +1,3 @@
-
 <?php
 /**
  * Google Photos API functionality
@@ -208,8 +207,8 @@ class WP_Gallery_Link_Google_API {
      * AJAX: Fetch albums
      */
     public function ajax_fetch_albums() {
-        // Check nonce - improved to not exit if fails to allow for response
-        $valid_nonce = check_ajax_referer('wpgl_debug', 'nonce', false);
+        // Check nonce - using wpgl_nonce instead of wpgl_debug
+        $valid_nonce = check_ajax_referer('wpgl_nonce', 'nonce', false);
         
         if (!$valid_nonce) {
             wp_gallery_link()->log('Album fetch nonce check failed', 'error', $_REQUEST);
@@ -317,9 +316,10 @@ class WP_Gallery_Link_Google_API {
      * AJAX: Import album
      */
     public function ajax_import_album() {
-        // Check nonce
-        if (!check_ajax_referer('wpgl_debug', 'nonce', false)) {
+        // Check nonce - using wpgl_nonce instead of wpgl_debug
+        if (!check_ajax_referer('wpgl_nonce', 'nonce', false)) {
             wp_send_json_error(array('message' => __('Security check failed', 'wp-gallery-link')));
+            return;
         }
         
         // Get album data
@@ -532,8 +532,8 @@ class WP_Gallery_Link_Google_API {
      * AJAX: Test API connection
      */
     public function ajax_test_api() {
-        // Check nonce - improved to not exit if fails
-        $valid_nonce = check_ajax_referer('wpgl_debug', 'nonce', false);
+        // Check nonce - using wpgl_nonce instead of wpgl_debug
+        $valid_nonce = check_ajax_referer('wpgl_nonce', 'nonce', false);
         
         if (!$valid_nonce) {
             wp_gallery_link()->log('API test nonce check failed', 'error', $_REQUEST);
@@ -612,9 +612,10 @@ class WP_Gallery_Link_Google_API {
      * AJAX: Refresh token
      */
     public function ajax_refresh_token() {
-        // Check nonce
-        if (!check_ajax_referer('wpgl_debug', 'nonce', false)) {
+        // Check nonce - using wpgl_nonce instead of wpgl_debug
+        if (!check_ajax_referer('wpgl_nonce', 'nonce', false)) {
             wp_send_json_error(array('message' => __('Security check failed', 'wp-gallery-link')));
+            return;
         }
         
         if ($this->refresh_access_token()) {

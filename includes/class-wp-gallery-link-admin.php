@@ -76,7 +76,7 @@ class WP_Gallery_Link_Admin {
      * Enqueue admin scripts and styles
      */
     public function enqueue_scripts($hook) {
-        if (!in_array($hook, array('toplevel_page_wp-gallery-link', 'wp-gallery-link_page_wp-gallery-link-import', 'wp-gallery-link_page_wp-gallery-link-debug'))) {
+        if (!in_array($hook, array('toplevel_page_wp-gallery-link', 'wp-gallery-link_page_wp-gallery-link-import'))) {
             return;
         }
         
@@ -98,8 +98,8 @@ class WP_Gallery_Link_Admin {
         wp_localize_script('wp-gallery-link-admin', 'wpglAdmin', array(
             'ajaxUrl' => admin_url('admin-ajax.php'),
             'nonce' => wp_create_nonce('wpgl_nonce'),
-            'version' => WP_GALLERY_LINK_VERSION,
             'debugMode' => WP_GALLERY_LINK_DEBUG,
+            'loadAllAlbums' => true,
             'i18n' => array(
                 'importing' => __('Importing...', 'wp-gallery-link'),
                 'imported' => __('Imported', 'wp-gallery-link'),
@@ -109,8 +109,7 @@ class WP_Gallery_Link_Admin {
                 'loading_albums' => __('Loading albums...', 'wp-gallery-link'),
                 'load_more' => __('Load more', 'wp-gallery-link'),
                 'no_more_albums' => __('No more albums to load.', 'wp-gallery-link'),
-                'error_loading' => __('Error loading albums:', 'wp-gallery-link'),
-                'no_cover' => __('No Cover Image', 'wp-gallery-link')
+                'error_loading' => __('Error loading albums:', 'wp-gallery-link')
             )
         ));
         
