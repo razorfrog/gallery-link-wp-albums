@@ -21,5 +21,11 @@ define('WP_GALLERY_LINK_PATH', plugin_dir_path(__FILE__));
 define('WP_GALLERY_LINK_URL', plugin_dir_url(__FILE__));
 define('WP_GALLERY_LINK_DEBUG', true);
 
-// Include the main plugin file
-require_once plugin_dir_path(__FILE__) . 'wp-gallery-link.php';
+// Include the necessary files
+require_once WP_GALLERY_LINK_PATH . 'includes/class-wp-gallery-link-cpt.php';
+require_once WP_GALLERY_LINK_PATH . 'wp-gallery-link.php';
+
+// Log plugin initialization for debugging
+if (WP_GALLERY_LINK_DEBUG) {
+    error_log('Google Photos Albums plugin initialized with path: ' . WP_GALLERY_LINK_PATH);
+}
