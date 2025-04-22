@@ -91,6 +91,9 @@ class WP_Gallery_Link {
         
         // Initialize plugin
         add_action('plugins_loaded', array($this, 'init'));
+        
+        // Add debug actions
+        add_action('wp_ajax_wpgl_get_debug_log', array($this, 'ajax_get_debug_log'));
     }
 
     /**
@@ -99,6 +102,11 @@ class WP_Gallery_Link {
     public function init() {
         // Load text domain for translations
         load_plugin_textdomain('wp-gallery-link', false, dirname(plugin_basename(__FILE__)) . '/languages');
+        
+        // Add frontend debugging (if enabled)
+        if (WP_DEBUG && current_user_can('manage_options')) {
+            add_action('wp_footer', array($this, 'add_frontend_debug'));
+        }
     }
     
     /**
@@ -108,6 +116,11 @@ class WP_Gallery_Link {
         // Register CPT on activation so rewrite rules can be flushed
         $this->cpt->register_post_type();
         flush_rewrite_rules();
+        
+        // Log activation
+        if (WP_DEBUG) {
+            error_log('WP Gallery Link: Plugin activated');
+        }
     }
     
     /**
@@ -115,6 +128,50 @@ class WP_Gallery_Link {
      */
     public function deactivate() {
         flush_rewrite_rules();
+        
+        // Log deactivation
+        if (WP_DEBUG) {
+            error_log('WP Gallery Link: Plugin deactivated');
+        }
+    }
+    
+    /**
+     * Add frontend debugging
+     */
+    public function add_frontend_debug() {
+        if (!current_user_can('manage_options')) {
+            return;
+        }
+        
+        // Add console debugging
+        ?>
+        <script>
+        console.log('WP Gallery Link: Debug information');
+        console.log('Plugin URL: <?php echo WP_GALLERY_LINK_URL; ?>');
+        console.log('Version: <?php echo WP_GALLERY_LINK_VERSION; ?>');
+        console.log('API Authorized: <?php echo $this->google_api->is_authorized() ? 'Yes' : 'No'; ?>');
+        </script>
+        <?php
+    }
+    
+    /**
+     * AJAX handler for getting debug log
+     */
+    public function ajax_get_debug_log() {
+        // Check nonce for security
+        if (!check_ajax_referer('wpgl_debug', 'nonce', false)) {
+            wp_send_json_error(array('message' => __('Security check failed', 'wp-gallery-link')));
+        }
+        
+        // Check user capabilities
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(array('message' => __('Insufficient permissions', 'wp-gallery-link')));
+        }
+        
+        // Get log
+        $log = $this->google_api->get_debug_log();
+        
+        wp_send_json_success(array('log' => $log));
     }
 }
 

@@ -26,6 +26,7 @@ jQuery(document).ready(function($) {
         // Simple fallback for templates (minimal implementation)
         var templateElement = $('#tmpl-' + id);
         if (templateElement.length === 0) {
+            console.log('Template not found: ' + id);
             return ''; // Template not found
         }
         
@@ -82,10 +83,16 @@ jQuery(document).ready(function($) {
         
         if (albums.length === 0) {
             $albumsGrid.append('<div class="notice notice-info"><p>' + wpglAdmin.i18n.noAlbums + '</p></div>');
+            console.log('No albums to render');
+            addLog('No albums found to display');
             return;
         }
         
+        console.log('Rendering ' + albums.length + ' albums', albums);
+        addLog('Rendering ' + albums.length + ' albums');
+        
         $.each(albums, function(index, album) {
+            console.log('Rendering album:', album);
             var html = renderTemplate('wpgl-album', album);
             $albumsGrid.append(html);
         });
@@ -99,6 +106,7 @@ jQuery(document).ready(function($) {
      */
     function updateProgress(percent, message) {
         $progressBar.css('width', percent + '%');
+        console.log('Progress: ' + percent + '%' + (message ? ' - ' + message : ''));
         
         if (message) {
             addLog(message);
@@ -110,7 +118,9 @@ jQuery(document).ready(function($) {
      */
     function addLog(message) {
         var time = new Date().toLocaleTimeString();
-        $loadingLog.append('<div class="wpgl-log-entry">[' + time + '] ' + message + '</div>');
+        var logEntry = '[' + time + '] ' + message;
+        console.log(logEntry);
+        $loadingLog.append('<div class="wpgl-log-entry">' + logEntry + '</div>');
         $loadingLog.scrollTop($loadingLog[0].scrollHeight);
     }
     
@@ -122,16 +132,24 @@ jQuery(document).ready(function($) {
         $loadingLog.empty();
         $albumsContainer.hide();
         $loadingText.text(wpglAdmin.i18n.loading);
+        console.log('Reset loading state');
+        addLog('Starting album loading process');
     }
     
     /**
      * Load albums from Google Photos
      */
     $loadButton.on('click', function() {
+        console.log('Load albums button clicked');
         resetLoadingState();
         
         // Update progress
         updateProgress(10, wpglAdmin.i18n.loading);
+        
+        // Debug info
+        console.log('AJAX URL:', wpglAdmin.ajaxUrl);
+        console.log('Nonce:', wpglAdmin.nonce);
+        addLog('Sending AJAX request to WordPress');
         
         // Make AJAX request
         $.ajax({
@@ -142,18 +160,37 @@ jQuery(document).ready(function($) {
                 nonce: wpglAdmin.nonce
             },
             success: function(response) {
+                console.log('AJAX Response:', response);
                 updateProgress(100, 'Albums loaded successfully');
                 
-                if (response.success && response.data.albums) {
+                if (response.success && response.data && response.data.albums) {
+                    addLog('Albums received: ' + (response.data.albums ? response.data.albums.length : 0));
                     renderAlbums(response.data.albums);
                 } else {
-                    addLog(wpglAdmin.i18n.error + ' ' + (response.data ? response.data.message : 'Unknown error'));
+                    var errorMsg = 'Error: ' + (response.data ? response.data.message : 'Unknown error');
+                    console.error(errorMsg);
+                    addLog(errorMsg);
                     $albumsContainer.hide();
                 }
             },
-            error: function(xhr) {
+            error: function(xhr, status, error) {
+                console.error('AJAX Error:', {xhr: xhr, status: status, error: error});
                 updateProgress(100, 'Error loading albums');
-                addLog(wpglAdmin.i18n.error + ' ' + xhr.responseText || 'Server error');
+                var errorDetails = '';
+                
+                try {
+                    if (xhr.responseText) {
+                        var jsonResponse = JSON.parse(xhr.responseText);
+                        errorDetails = jsonResponse.message || xhr.responseText;
+                    } else {
+                        errorDetails = error || 'Server error';
+                    }
+                } catch (e) {
+                    errorDetails = xhr.responseText || error || 'Server error';
+                }
+                
+                console.error('Error details:', errorDetails);
+                addLog(wpglAdmin.i18n.error + ' ' + errorDetails);
                 $albumsContainer.hide();
             }
         });
@@ -170,6 +207,9 @@ jQuery(document).ready(function($) {
         // Disable button
         $button.prop('disabled', true).text(wpglAdmin.i18n.importing);
         
+        console.log('Importing album:', albumId);
+        addLog('Importing album ID: ' + albumId);
+        
         // Find album data
         var title = $albumElement.find('.wpgl-album-title').text();
         var albumData = {
@@ -178,6 +218,8 @@ jQuery(document).ready(function($) {
             coverPhotoBaseUrl: $albumElement.find('.wpgl-album-thumbnail img').attr('src'),
             mediaItemsCount: $albumElement.find('.wpgl-album-count').text().split(' ')[0]
         };
+        
+        console.log('Album data:', albumData);
         
         // Make AJAX request to import
         $.ajax({
@@ -189,7 +231,9 @@ jQuery(document).ready(function($) {
                 album: albumData
             },
             success: function(response) {
+                console.log('Import response:', response);
                 if (response.success) {
+                    addLog('Album "' + title + '" imported successfully');
                     $button.text(wpglAdmin.i18n.imported)
                            .removeClass('button-primary')
                            .addClass('button-disabled');
@@ -200,21 +244,29 @@ jQuery(document).ready(function($) {
                     }
                 } else {
                     $button.prop('disabled', false).text(wpglAdmin.i18n.import);
-                    alert(wpglAdmin.i18n.error + ' ' + (response.data ? response.data.message : 'Unknown error'));
+                    var errorMsg = wpglAdmin.i18n.error + ' ' + (response.data ? response.data.message : 'Unknown error');
+                    console.error(errorMsg);
+                    addLog(errorMsg);
+                    alert(errorMsg);
                 }
             },
-            error: function() {
+            error: function(xhr, status, error) {
+                console.error('Import AJAX Error:', {xhr: xhr, status: status, error: error});
                 $button.prop('disabled', false).text(wpglAdmin.i18n.import);
-                alert(wpglAdmin.i18n.error + ' Server error');
+                var errorMsg = wpglAdmin.i18n.error + ' ' + (xhr.responseText || 'Server error');
+                addLog(errorMsg);
+                alert(errorMsg);
             }
         });
     });
 
     // For demo purposes - auto-load albums after a short delay
     if (window.location.href.indexOf('page=wp-gallery-link-import') > -1) {
+        console.log('On import page, auto-loading albums');
         setTimeout(function() {
             // Create demo albums if they don't exist
             if ($albumsGrid.find('.wpgl-album').length === 0) {
+                console.log('No existing albums found, preparing demo albums');
                 var demoAlbums = [
                     {
                         id: 'demo1',
@@ -236,6 +288,8 @@ jQuery(document).ready(function($) {
                     }
                 ];
                 
+                console.log('Auto-clicking load button');
+                addLog('Auto-loading albums in demo mode');
                 $loadButton.trigger('click');
                 
                 // Simulate loading
@@ -246,8 +300,9 @@ jQuery(document).ready(function($) {
                     
                     if (progress >= 100) {
                         clearInterval(loadingInterval);
+                        console.log('Demo albums:', demoAlbums);
                         renderAlbums(demoAlbums);
-                        addLog('Albums loaded successfully');
+                        addLog('Demo albums loaded successfully');
                     }
                 }, 300);
             }

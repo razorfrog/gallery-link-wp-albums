@@ -1,4 +1,3 @@
-
 <?php
 /**
  * Admin functionality
@@ -18,6 +17,9 @@ class WP_Gallery_Link_Admin {
         
         // AJAX import album action
         add_action('wp_ajax_wpgl_import_album', array($this, 'ajax_import_album'));
+        
+        // Add debug actions
+        add_action('wp_ajax_wpgl_clear_debug_log', array($this, 'ajax_clear_debug_log'));
     }
     
     /**
@@ -70,6 +72,16 @@ class WP_Gallery_Link_Admin {
             'wp-gallery-link-auth',
             array($this, 'render_auth_callback_page')
         );
+        
+        // Add debug page
+        add_submenu_page(
+            'wp-gallery-link',
+            __('Debug Log', 'wp-gallery-link'),
+            __('Debug Log', 'wp-gallery-link'),
+            'manage_options',
+            'wp-gallery-link-debug',
+            array($this, 'render_debug_page')
+        );
     }
     
     /**
@@ -100,6 +112,7 @@ class WP_Gallery_Link_Admin {
             'ajaxUrl' => admin_url('admin-ajax.php'),
             'nonce' => wp_create_nonce('wpgl_fetch_albums'),
             'importNonce' => wp_create_nonce('wpgl_import_album'),
+            'debugNonce' => wp_create_nonce('wpgl_debug'),
             'i18n' => array(
                 'loading' => __('Loading albums...', 'wp-gallery-link'),
                 'error' => __('Error:', 'wp-gallery-link'),
@@ -121,6 +134,12 @@ class WP_Gallery_Link_Admin {
         register_setting('wpgl_settings', 'wpgl_shortcode_columns', array(
             'default' => 3,
             'sanitize_callback' => 'absint'
+        ));
+        
+        // Add debug option
+        register_setting('wpgl_settings', 'wpgl_enable_debug', array(
+            'default' => true,
+            'sanitize_callback' => 'rest_sanitize_boolean'
         ));
     }
     
@@ -524,6 +543,31 @@ class WP_Gallery_Link_Admin {
                     </table>
                 </div>
                 
+                <div class="wpgl-settings-section">
+                    <h2><?php _e('Debug Settings', 'wp-gallery-link'); ?></h2>
+                    
+                    <table class="form-table">
+                        <tr>
+                            <th scope="row">
+                                <label for="wpgl_enable_debug"><?php _e('Enable Debug Mode', 'wp-gallery-link'); ?></label>
+                            </th>
+                            <td>
+                                <input type="checkbox" 
+                                       id="wpgl_enable_debug" 
+                                       name="wpgl_enable_debug" 
+                                       value="1" 
+                                       <?php checked(get_option('wpgl_enable_debug', true)); ?>>
+                                <p class="description">
+                                    <?php _e('Enable detailed logging for troubleshooting.', 'wp-gallery-link'); ?>
+                                    <a href="<?php echo admin_url('admin.php?page=wp-gallery-link-debug'); ?>">
+                                        <?php _e('View Debug Log', 'wp-gallery-link'); ?>
+                                    </a>
+                                </p>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                
                 <?php submit_button(); ?>
             </form>
         </div>
@@ -701,5 +745,238 @@ class WP_Gallery_Link_Admin {
             'post_id' => $result,
             'edit_url' => get_edit_post_link($result, 'raw')
         ));
+    }
+    
+    /**
+     * Render debug page
+     */
+    public function render_debug_page() {
+        if (!current_user_can('manage_options')) {
+            wp_die(__('You do not have sufficient permissions to access this page.', 'wp-gallery-link'));
+        }
+        
+        $google_api = wp_gallery_link()->google_api;
+        $log_entries = $google_api->get_debug_log();
+        ?>
+        <div class="wrap wpgl-admin">
+            <h1><?php _e('WP Gallery Link Debug Log', 'wp-gallery-link'); ?></h1>
+            
+            <div class="wpgl-debug-toolbar">
+                <button id="wpgl-refresh-log" class="button">
+                    <span class="dashicons dashicons-update"></span>
+                    <?php _e('Refresh Log', 'wp-gallery-link'); ?>
+                </button>
+                
+                <button id="wpgl-clear-log" class="button">
+                    <span class="dashicons dashicons-trash"></span>
+                    <?php _e('Clear Log', 'wp-gallery-link'); ?>
+                </button>
+                
+                <label>
+                    <input type="checkbox" id="wpgl-auto-refresh"> 
+                    <?php _e('Auto-refresh (10s)', 'wp-gallery-link'); ?>
+                </label>
+            </div>
+            
+            <div class="wpgl-debug-info">
+                <h2><?php _e('System Information', 'wp-gallery-link'); ?></h2>
+                <table class="widefat striped">
+                    <tr>
+                        <th><?php _e('WordPress Version', 'wp-gallery-link'); ?></th>
+                        <td><?php echo get_bloginfo('version'); ?></td>
+                    </tr>
+                    <tr>
+                        <th><?php _e('PHP Version', 'wp-gallery-link'); ?></th>
+                        <td><?php echo phpversion(); ?></td>
+                    </tr>
+                    <tr>
+                        <th><?php _e('Plugin Version', 'wp-gallery-link'); ?></th>
+                        <td><?php echo WP_GALLERY_LINK_VERSION; ?></td>
+                    </tr>
+                    <tr>
+                        <th><?php _e('API Credentials Configured', 'wp-gallery-link'); ?></th>
+                        <td>
+                            <?php 
+                            $has_credentials = !empty(get_option('wpgl_google_client_id')) && !empty(get_option('wpgl_google_client_secret'));
+                            echo $has_credentials ? '<span class="dashicons dashicons-yes"></span> ' . __('Yes', 'wp-gallery-link') : '<span class="dashicons dashicons-no"></span> ' . __('No', 'wp-gallery-link');
+                            ?>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th><?php _e('API Authorized', 'wp-gallery-link'); ?></th>
+                        <td>
+                            <?php 
+                            echo $google_api->is_authorized() ? '<span class="dashicons dashicons-yes"></span> ' . __('Yes', 'wp-gallery-link') : '<span class="dashicons dashicons-no"></span> ' . __('No', 'wp-gallery-link');
+                            ?>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+            
+            <div class="wpgl-debug-log-container">
+                <h2><?php _e('Debug Log', 'wp-gallery-link'); ?></h2>
+                
+                <?php if (empty($log_entries)): ?>
+                    <div class="notice notice-info">
+                        <p><?php _e('No log entries found.', 'wp-gallery-link'); ?></p>
+                    </div>
+                <?php else: ?>
+                    <div id="wpgl-debug-log" class="wpgl-debug-log">
+                        <?php foreach ($log_entries as $entry): ?>
+                            <div class="wpgl-log-entry"><?php echo esc_html($entry); ?></div>
+                        <?php endforeach; ?>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
+        
+        <script>
+        jQuery(document).ready(function($) {
+            var autoRefreshInterval;
+            
+            // Refresh log
+            function refreshLog() {
+                $.ajax({
+                    url: ajaxurl,
+                    method: 'POST',
+                    data: {
+                        action: 'wpgl_get_debug_log',
+                        nonce: wpglAdmin.debugNonce
+                    },
+                    success: function(response) {
+                        if (response.success && response.data.log) {
+                            var logHtml = '';
+                            $.each(response.data.log, function(index, entry) {
+                                logHtml += '<div class="wpgl-log-entry">' + entry + '</div>';
+                            });
+                            $('#wpgl-debug-log').html(logHtml);
+                        }
+                    }
+                });
+            }
+            
+            // Clear log
+            $('#wpgl-clear-log').on('click', function() {
+                if (confirm('<?php _e('Are you sure you want to clear the debug log?', 'wp-gallery-link'); ?>')) {
+                    $.ajax({
+                        url: ajaxurl,
+                        method: 'POST',
+                        data: {
+                            action: 'wpgl_clear_debug_log',
+                            nonce: wpglAdmin.debugNonce
+                        },
+                        success: function(response) {
+                            if (response.success) {
+                                $('#wpgl-debug-log').html('<div class="wpgl-log-entry"><?php _e('Log cleared.', 'wp-gallery-link'); ?></div>');
+                            }
+                        }
+                    });
+                }
+            });
+            
+            // Manual refresh
+            $('#wpgl-refresh-log').on('click', function() {
+                refreshLog();
+            });
+            
+            // Auto-refresh toggle
+            $('#wpgl-auto-refresh').on('change', function() {
+                if ($(this).is(':checked')) {
+                    autoRefreshInterval = setInterval(refreshLog, 10000);
+                } else {
+                    clearInterval(autoRefreshInterval);
+                }
+            });
+        });
+        </script>
+        
+        <style>
+            .wpgl-debug-toolbar {
+                margin: 20px 0;
+                display: flex;
+                align-items: center;
+                gap: 10px;
+            }
+            
+            .wpgl-debug-log-container {
+                margin-top: 20px;
+            }
+            
+            .wpgl-debug-log {
+                background: #f0f0f1;
+                border: 1px solid #ccc;
+                padding: 10px;
+                height: 400px;
+                overflow-y: auto;
+                font-family: monospace;
+                font-size: 12px;
+                white-space: pre-wrap;
+                word-wrap: break-word;
+            }
+            
+            .wpgl-log-entry {
+                padding: 2px 0;
+                border-bottom: 1px solid #eee;
+            }
+            
+            .wpgl-log-entry:last-child {
+                border-bottom: none;
+            }
+            
+            .wpgl-debug-info {
+                margin-top: 20px;
+            }
+            
+            .wpgl-debug-info table {
+                table-layout: fixed;
+            }
+            
+            .wpgl-debug-info th {
+                width: 300px;
+            }
+        </style>
+        <?php
+    }
+    
+    /**
+     * AJAX handler for clearing debug log
+     */
+    public function ajax_clear_debug_log() {
+        // Check nonce for security
+        if (!check_ajax_referer('wpgl_debug', 'nonce', false)) {
+            wp_send_json_error(array('message' => __('Security check failed', 'wp-gallery-link')));
+        }
+        
+        // Check user capabilities
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(array('message' => __('Insufficient permissions', 'wp-gallery-link')));
+        }
+        
+        // Clear log
+        $google_api = wp_gallery_link()->google_api;
+        $google_api->clear_debug_log();
+        
+        wp_send_json_success(array('message' => __('Log cleared', 'wp-gallery-link')));
+    }
+    
+    /**
+     * AJAX handler for getting debug log
+     */
+    public function ajax_get_debug_log() {
+        // Check nonce for security
+        if (!check_ajax_referer('wpgl_debug', 'nonce', false)) {
+            wp_send_json_error(array('message' => __('Security check failed', 'wp-gallery-link')));
+        }
+        
+        // Check user capabilities
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(array('message' => __('Insufficient permissions', 'wp-gallery-link')));
+        }
+        
+        // Get log
+        $google_api = wp_gallery_link()->google_api;
+        $log = $google_api->get_debug_log();
+        
+        wp_send_json_success(array('log' => $log));
     }
 }
