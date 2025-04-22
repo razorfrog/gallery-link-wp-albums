@@ -1,4 +1,3 @@
-
 <?php
 /**
  * Google Photos API functionality
@@ -443,14 +442,15 @@ class WP_Gallery_Link_Google_API {
             'media_count' => isset($body['mediaItemsCount']) ? $body['mediaItemsCount'] : 0
         ));
         
-        // Return album details
+        // Return album details with creation date included if available
         return array(
             'id' => $body['id'],
             'title' => $body['title'],
             'mediaItemsCount' => isset($body['mediaItemsCount']) ? $body['mediaItemsCount'] : 0,
             'coverPhotoBaseUrl' => isset($body['coverPhotoBaseUrl']) ? $body['coverPhotoBaseUrl'] : '',
             'productUrl' => isset($body['productUrl']) ? $body['productUrl'] : '',
-            'isWriteable' => isset($body['isWriteable']) ? $body['isWriteable'] : false
+            'isWriteable' => isset($body['isWriteable']) ? $body['isWriteable'] : false,
+            'creationTime' => isset($body['creationTime']) ? $body['creationTime'] : ''
         );
     }
     

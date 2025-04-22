@@ -1,4 +1,3 @@
-
 <?php
 /**
  * Shortcode functionality
@@ -83,25 +82,11 @@ class WP_Gallery_Link_Shortcode {
                 
             case 'custom':
             default:
-                // Modified: Use meta_query to include posts with and without the custom order field
-                $query_args['meta_query'] = array(
-                    'relation' => 'OR',
-                    // First get posts WITH the custom order field
-                    array(
-                        'key' => '_gphoto_album_order',
-                        'compare' => 'EXISTS',
-                    ),
-                    // Then get posts WITHOUT the custom order field
-                    array(
-                        'key' => '_gphoto_album_order',
-                        'compare' => 'NOT EXISTS',
-                    )
-                );
-                
-                // Sort by the meta value numerically
+                // Include all posts regardless of whether they have the custom order field
+                // No meta_query needed - we'll just order by the meta value with a fallback to title
                 $query_args['orderby'] = array(
                     'meta_value_num' => $atts['order'],
-                    'title' => 'ASC' // Secondary sort by title
+                    'title' => 'ASC' // Secondary sort by title for posts without order or with same order
                 );
                 $query_args['meta_key'] = '_gphoto_album_order';
                 break;
@@ -182,4 +167,3 @@ class WP_Gallery_Link_Shortcode {
         return ob_get_clean();
     }
 }
-
