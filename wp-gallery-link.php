@@ -1,4 +1,3 @@
-
 <?php
 /**
  * Main plugin file for Google Photos Albums
@@ -155,13 +154,24 @@ class WP_Gallery_Link {
             wp_send_json_error(array('message' => __('Security check failed', 'wp-gallery-link')));
             return;
         }
-        
+
         $this->log('WP Gallery Link: Fetching albums via AJAX', 'info');
-        
-        // Check if we have a page token to properly paginate
+
+        // Accept perPage as an argument, default 6 if not given (so UI can override)
+        $per_page = isset($_POST['perPage']) ? intval($_POST['perPage']) : 6;
+
+        // Accept "pageToken" as a base64-encoded offset (simulate real tokens)
         $page_token = isset($_POST['pageToken']) ? sanitize_text_field($_POST['pageToken']) : '';
-        
-        // For demo purposes, we'll generate more detailed sample albums
+        $offset = 0;
+        if ($page_token) {
+            // Decode a real offset if pagetoken present (simulate real tokens)
+            $decoded = base64_decode($page_token);
+            if ($decoded !== false && is_numeric($decoded)) {
+                $offset = intval($decoded);
+            }
+        }
+
+        // Demo: Generate full sample albums array (as before)
         $all_sample_albums = array(
             array(
                 'id' => 'album1',
@@ -212,9 +222,9 @@ class WP_Gallery_Link {
                 'creationTime' => '2023-09-22T18:45:00Z'
             )
         );
-        
-        // Add 6 more albums for the second page
-        for ($i = 7; $i <= 12; $i++) {
+
+        // More demo albums for MANY pages
+        for ($i = 7; $i <= 48; $i++) {
             $all_sample_albums[] = array(
                 'id' => 'album' . $i,
                 'title' => 'Sample Album ' . $i,
@@ -224,22 +234,24 @@ class WP_Gallery_Link {
                 'creationTime' => '2023-' . sprintf('%02d', rand(1, 12)) . '-' . sprintf('%02d', rand(1, 28)) . 'T' . rand(10, 23) . ':' . rand(10, 59) . ':00Z'
             );
         }
-        
-        // For pagination demonstration
-        if (empty($page_token)) {
-            // First page
-            $sample_albums = array_slice($all_sample_albums, 0, 6);
-            $next_page_token = 'page2'; // Token for the next page
+
+        $total = count($all_sample_albums);
+
+        // Correctly slice the array for pagination
+        $albums = array_slice($all_sample_albums, $offset, $per_page);
+
+        // Next page token (encode offset + per_page if more remain)
+        $new_offset = $offset + $per_page;
+        if ($new_offset < $total) {
+            $next_page_token = base64_encode((string)$new_offset);
         } else {
-            // Second page
-            $sample_albums = array_slice($all_sample_albums, 6, 6);
-            $next_page_token = ''; // No more pages
+            $next_page_token = '';
         }
-        
-        $this->log('WP Gallery Link: Returning ' . count($sample_albums) . ' sample albums for page token: ' . $page_token, 'info');
-        
+
+        $this->log('WP Gallery Link: Returning ' . count($albums) . ' albums (offset=' . $offset . ', per_page=' . $per_page . ') of ' . $total, 'info');
+
         wp_send_json_success(array(
-            'albums' => $sample_albums,
+            'albums' => $albums,
             'nextPageToken' => $next_page_token
         ));
     }
