@@ -1,0 +1,161 @@
+
+/* Frontend Styles for WP Gallery Link */
+
+.wp-gallery-link-container {
+    margin: 20px 0;
+}
+
+/* Album Grid */
+.wpgl-album-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+}
+
+.wpgl-columns-1 {
+    grid-template-columns: repeat(1, 1fr);
+}
+
+.wpgl-columns-2 {
+    grid-template-columns: repeat(2, 1fr);
+}
+
+.wpgl-columns-3 {
+    grid-template-columns: repeat(3, 1fr);
+}
+
+.wpgl-columns-4 {
+    grid-template-columns: repeat(4, 1fr);
+}
+
+.wpgl-columns-5 {
+    grid-template-columns: repeat(5, 1fr);
+}
+
+.wpgl-columns-6 {
+    grid-template-columns: repeat(6, 1fr);
+}
+
+/* Album Styling */
+.wpgl-album {
+    position: relative;
+    overflow: hidden;
+}
+
+.wpgl-album-inner {
+    background-color: #fff;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.wpgl-album-inner:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.15);
+}
+
+.wpgl-album-link {
+    display: block;
+    text-decoration: none;
+    color: inherit;
+}
+
+.wpgl-album-thumbnail {
+    position: relative;
+    padding-top: 75%; /* 4:3 aspect ratio */
+    overflow: hidden;
+    background-color: #f9f9f9;
+}
+
+.wpgl-album-thumbnail img {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.5s ease;
+}
+
+.wpgl-album-link:hover .wpgl-album-thumbnail img {
+    transform: scale(1.1);
+}
+
+.wpgl-no-thumbnail {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #f0f0f0;
+}
+
+.wpgl-no-thumbnail .dashicons {
+    font-size: 40px;
+    width: 40px;
+    height: 40px;
+    color: #aaa;
+}
+
+.wpgl-album-content {
+    padding: 15px;
+}
+
+.wpgl-album-title {
+    margin: 0 0 10px 0;
+    font-size: 16px;
+    line-height: 1.4;
+    font-weight: 500;
+}
+
+.wpgl-album-date {
+    color: #666;
+    font-size: 14px;
+    margin-bottom: 8px;
+}
+
+.wpgl-album-categories {
+    color: #777;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.wpgl-no-albums {
+    text-align: center;
+    padding: 30px;
+    background-color: #f9f9f9;
+    border-radius: 8px;
+    color: #666;
+}
+
+/* Responsive */
+@media screen and (max-width: 768px) {
+    .wpgl-columns-4, .wpgl-columns-5, .wpgl-columns-6 {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media screen and (max-width: 600px) {
+    .wpgl-album-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .wpgl-columns-3, .wpgl-columns-4, .wpgl-columns-5, .wpgl-columns-6 {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media screen and (max-width: 480px) {
+    .wpgl-album-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .wpgl-columns-2, .wpgl-columns-3, .wpgl-columns-4, .wpgl-columns-5, .wpgl-columns-6 {
+        grid-template-columns: 1fr;
+    }
+}

@@ -1,0 +1,148 @@
+
+/* Admin Styles for WP Gallery Link */
+
+/* Container styling */
+.wpgl-container {
+    margin-top: 20px;
+}
+
+.wpgl-section {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+/* Connection status */
+.wpgl-connected, .wpgl-not-connected {
+    display: flex;
+    align-items: center;
+    font-weight: 500;
+}
+
+.wpgl-connected {
+    color: #46b450;
+}
+
+.wpgl-not-connected {
+    color: #dc3232;
+}
+
+.wpgl-connected .dashicons, .wpgl-not-connected .dashicons {
+    margin-right: 8px;
+}
+
+/* Import page */
+.wpgl-import-container {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    padding: 20px;
+    margin-top: 20px;
+}
+
+.wpgl-import-header {
+    margin-bottom: 20px;
+}
+
+.wpgl-album-list {
+    min-height: 200px;
+}
+
+#wpgl-albums-loading {
+    display: flex;
+    align-items: center;
+}
+
+#wpgl-albums-loading .spinner {
+    margin: 0 10px 0 0;
+}
+
+#wpgl-albums-pagination {
+    margin-top: 20px;
+    text-align: center;
+}
+
+/* Album items */
+.wpgl-album-item {
+    display: flex;
+    margin-bottom: 15px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.wpgl-album-thumbnail {
+    width: 100px;
+    height: 100px;
+    margin-right: 15px;
+    border-radius: 3px;
+    overflow: hidden;
+    background-color: #f9f9f9;
+    border: 1px solid #eee;
+    position: relative;
+    flex-shrink: 0;
+}
+
+.wpgl-album-thumbnail img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.wpgl-no-thumbnail {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    background-color: #f9f9f9;
+    color: #999;
+    font-size: 12px;
+    text-transform: uppercase;
+}
+
+.wpgl-album-details {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.wpgl-album-title {
+    margin: 0 0 10px 0;
+    font-size: 16px;
+}
+
+.wpgl-album-meta {
+    color: #666;
+    font-size: 13px;
+    margin-bottom: 10px;
+}
+
+.wpgl-album-actions {
+    margin-top: auto;
+}
+
+.wpgl-album-actions .button {
+    margin-right: 5px;
+}
+
+/* Spinner while importing */
+.wpgl-importing .spinner {
+    visibility: visible;
+    float: none;
+    margin: 0 5px 0 0;
+}
+
+/* Media Queries */
+@media screen and (max-width: 782px) {
+    .wpgl-album-item {
+        flex-direction: column;
+    }
+    
+    .wpgl-album-thumbnail {
+        margin-right: 0;
+        margin-bottom: 10px;
+        width: 100%;
+        height: 150px;
+    }
+}
