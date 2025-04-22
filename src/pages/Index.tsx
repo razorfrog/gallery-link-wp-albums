@@ -1,12 +1,12 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { AlbumCard } from "@/components/AlbumCard";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
-import { RefreshCw, Info } from "lucide-react";
+import { RefreshCw, Info, Loader, Stop, Play } from "lucide-react";
 
 type Album = {
   id: number;
@@ -22,107 +22,128 @@ type LoadingLog = {
   timestamp: string;
 };
 
+const DEMO_ALBUMS: Album[] = [
+  {
+    id: 1,
+    title: "Summer Vacation",
+    photoCount: 42,
+    coverImage: "/placeholder.svg",
+    date: "2024-06-15"
+  },
+  {
+    id: 2,
+    title: "Family Gathering",
+    photoCount: 78,
+    coverImage: "/placeholder.svg",
+    date: "2024-05-22"
+  },
+  {
+    id: 3,
+    title: "Nature Photography",
+    photoCount: 53,
+    coverImage: "/placeholder.svg",
+    date: "2024-04-10"
+  }
+];
+
 const Index = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [albums, setAlbums] = useState<Album[]>([]);
   const [progress, setProgress] = useState(0);
   const [logs, setLogs] = useState<LoadingLog[]>([]);
+  const [fetchedAlbumTitles, setFetchedAlbumTitles] = useState<string[]>([]);
+  const [cancelLoading, setCancelLoading] = useState(false);
+
   const { toast } = useToast();
-  
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   const addLog = (message: string) => {
     setLogs(currentLogs => [
       ...currentLogs, 
       { 
-        id: Date.now(), 
+        id: Date.now() + Math.random(), 
         message, 
         timestamp: new Date().toLocaleTimeString() 
       }
     ]);
   };
-  
+
   const resetState = () => {
     setIsLoading(false);
     setProgress(0);
     setLogs([]);
     setAlbums([]);
+    setFetchedAlbumTitles([]);
+    setCancelLoading(false);
+    if (intervalRef.current) clearInterval(intervalRef.current);
   };
-  
-  const handleLoadAlbums = () => {
+
+  // The new start/stop logic
+  const handleStartLoading = () => {
     resetState();
-    
     setIsLoading(true);
-    
-    addLog("Starting to load albums...");
-    
-    let progressValue = 0;
-    const progressInterval = setInterval(() => {
-      progressValue += 5;
-      setProgress(progressValue);
-      
-      if (progressValue === 25) {
-        addLog("Authenticating with Google Photos API...");
+    addLog("Started loading albums...");
+    let step = 0;
+    setProgress(0);
+
+    setFetchedAlbumTitles([]);
+    setCancelLoading(false);
+
+    // Simulate authenticating
+    addLog("Authenticating with Google Photos API...");
+
+    intervalRef.current = setInterval(() => {
+      step += 1;
+
+      if (cancelLoading) {
+        addLog("Loading cancelled by user.");
+        setIsLoading(false);
+        setProgress(0);
+        setCancelLoading(false);
+        if (intervalRef.current) clearInterval(intervalRef.current);
+        return;
       }
-      
-      if (progressValue === 50) {
+
+      if (step === 1) {
+        setProgress(20);
         addLog("Fetching album list from Google...");
-      }
-      
-      if (progressValue === 75) {
-        addLog("Processing album data...");
-      }
-      
-      if (progressValue >= 100) {
-        clearInterval(progressInterval);
+      } else if (step === 2) {
+        setProgress(40);
+        addLog("Connected, beginning to retrieve albums...");
+      } else if (step >= 3 && step < (3 + DEMO_ALBUMS.length)) {
+        // Simulate grabbing each album one by one.
+        const albumIdx = step - 3;
+        const album = DEMO_ALBUMS[albumIdx];
+        setFetchedAlbumTitles(prev => [...prev, album.title]);
+        addLog(`Album "${album.title}" found (${album.photoCount} photos)`);
+        setProgress(Math.min(60 + albumIdx * 10, 95));
+      } else if (step === 3 + DEMO_ALBUMS.length) {
+        // Done
         setProgress(100);
-        finishLoading();
+        addLog("Albums loaded successfully!");
+        setAlbums(DEMO_ALBUMS);
+        setIsLoading(false);
+        toast({
+          title: "Albums Loaded",
+          description: `Successfully loaded ${DEMO_ALBUMS.length} albums`,
+        });
+        if (intervalRef.current) clearInterval(intervalRef.current);
       }
-    }, 125);
-    
-    setTimeout(() => {
-      if (isLoading && progress < 100) {
-        clearInterval(progressInterval);
-        setProgress(100);
-        addLog("Loading timed out, but we'll show some albums anyway");
-        finishLoading();
-      }
-    }, 5000);
+    }, 700);
   };
 
-  const finishLoading = () => {
-    addLog("Albums loaded successfully!");
-    setAlbums([
-      {
-        id: 1,
-        title: "Summer Vacation",
-        photoCount: 42,
-        coverImage: "/placeholder.svg",
-        date: "2024-06-15"
-      },
-      {
-        id: 2,
-        title: "Family Gathering",
-        photoCount: 78,
-        coverImage: "/placeholder.svg",
-        date: "2024-05-22"
-      },
-      {
-        id: 3,
-        title: "Nature Photography",
-        photoCount: 53,
-        coverImage: "/placeholder.svg",
-        date: "2024-04-10"
-      }
-    ]);
+  // Handle stop/cancel loading
+  const handleStopLoading = () => {
+    setCancelLoading(true);
     setIsLoading(false);
-    toast({
-      title: "Albums Loaded",
-      description: "Successfully loaded 3 albums",
-    });
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    addLog("Stopped album loading.");
   };
 
+  // Clean up interval on unmount
   useEffect(() => {
     return () => {
-      resetState();
+      if (intervalRef.current) clearInterval(intervalRef.current);
     };
   }, []);
 
@@ -133,7 +154,6 @@ const Index = () => {
         <p className="text-lg text-center mb-8">
           A WordPress plugin that connects with Google Photos to create a custom post type for albums.
         </p>
-        
         <div className="grid md:grid-cols-2 gap-6">
           <div className="bg-gray-50 p-4 rounded-lg">
             <h2 className="text-xl font-semibold mb-3">Key Features</h2>
@@ -146,7 +166,6 @@ const Index = () => {
               <li>Responsive gallery layout</li>
             </ul>
           </div>
-          
           <div className="bg-gray-50 p-4 rounded-lg">
             <h2 className="text-xl font-semibold mb-3">Plugin Usage</h2>
             <p className="mb-3">
@@ -160,7 +179,6 @@ const Index = () => {
             </ol>
           </div>
         </div>
-        
         <div className="mt-8 p-4 bg-blue-50 rounded-lg">
           <h2 className="text-xl font-semibold mb-3">Installation</h2>
           <p className="mb-4">
@@ -169,37 +187,47 @@ const Index = () => {
           </p>
         </div>
       </div>
-      
       <div className="max-w-5xl w-full mx-auto bg-white rounded-lg shadow-lg p-6">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-bold">Albums Demo</h2>
           <div className="flex gap-2">
-            {isLoading && (
+            {isLoading ? (
               <Button 
                 variant="outline"
-                onClick={resetState}
+                onClick={handleStopLoading}
                 className="flex items-center gap-1"
               >
-                <RefreshCw className="h-4 w-4" /> Reset
+                <Stop className="h-4 w-4" /> Stop
+              </Button>
+            ) : (
+              <Button 
+                variant="outline"
+                onClick={handleStartLoading}
+                className="flex items-center gap-1"
+              >
+                <Play className="h-4 w-4" /> Start
               </Button>
             )}
             <Button 
-              onClick={handleLoadAlbums} 
-              disabled={isLoading}
+              onClick={resetState}
+              className="flex items-center gap-1"
+              variant="ghost"
+              disabled={isLoading && !cancelLoading}
             >
-              {isLoading ? "Loading..." : "Load Albums"}
+              <RefreshCw className="h-4 w-4" /> Reset
             </Button>
           </div>
         </div>
-        
         {isLoading && (
           <div className="space-y-4 mb-6">
             <div className="flex items-center justify-between mb-2">
-              <p>Loading albums...</p>
+              <p className="flex items-center gap-1">
+                <Loader className="h-4 w-4 animate-spin text-blue-500" />
+                Loading albums...
+              </p>
               <span className="text-sm font-bold text-gray-500">{progress}%</span>
             </div>
             <Progress value={progress} className="h-2" />
-            
             <Alert className="bg-blue-50 border-blue-200">
               <Info className="h-4 w-4" />
               <AlertTitle>Loading Status Log</AlertTitle>
@@ -218,7 +246,19 @@ const Index = () => {
                 </div>
               </AlertDescription>
             </Alert>
-            
+            {/* Real-time text list of album names as they are found */}
+            <div className="bg-gray-50 rounded p-4">
+              <h4 className="font-medium mb-2">Albums Being Grabbed:</h4>
+              {fetchedAlbumTitles.length > 0 ? (
+                <ul className="list-disc ml-5 space-y-1">
+                  {fetchedAlbumTitles.map((title, idx) => (
+                    <li key={idx} className="text-sm text-gray-700">{title}</li>
+                  ))}
+                </ul>
+              ) : (
+                <div className="text-gray-400">No albums discovered yet...</div>
+              )}
+            </div>
             <div className="grid md:grid-cols-3 gap-4">
               {[1, 2, 3].map((i) => (
                 <AlbumCard
@@ -234,7 +274,6 @@ const Index = () => {
             </div>
           </div>
         )}
-        
         {!isLoading && (
           <div className="grid md:grid-cols-3 gap-4">
             {albums.length > 0 ? (
@@ -251,7 +290,7 @@ const Index = () => {
               ))
             ) : (
               <div className="col-span-3 py-8 text-center">
-                <p className="text-gray-500">No albums loaded. Click the "Load Albums" button to see a demo.</p>
+                <p className="text-gray-500">No albums loaded. Click the "Start" button to see a demo.</p>
               </div>
             )}
           </div>
