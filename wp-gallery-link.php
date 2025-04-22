@@ -1,4 +1,3 @@
-
 <?php
 /**
  * Plugin Name: WP Gallery Link
@@ -109,8 +108,46 @@ class WP_Gallery_Link {
         
         // Add a debug tab in admin
         add_action('admin_menu', array($this, 'add_debug_menu'));
+        
+        // Add our script localization
+        add_action('admin_enqueue_scripts', array($this, 'localize_admin_scripts'), 99);
     }
 
+    /**
+     * Localize admin scripts with proper nonces and data
+     */
+    public function localize_admin_scripts($hook) {
+        // Only on our plugin pages
+        if (strpos($hook, 'wp-gallery-link') === false) {
+            return;
+        }
+        
+        // Create a debug nonce
+        $debug_nonce = wp_create_nonce('wpgl_debug');
+        
+        // Add as a global variable for easier access
+        wp_localize_script('wp-gallery-link-admin', 'wpglAdmin', array(
+            'ajaxUrl' => admin_url('admin-ajax.php'),
+            'nonce' => $debug_nonce,
+            'version' => WP_GALLERY_LINK_VERSION,
+            'debugMode' => WP_GALLERY_LINK_DEBUG,
+            'i18n' => array(
+                'loading' => __('Loading...', 'wp-gallery-link'),
+                'error' => __('Error:', 'wp-gallery-link'),
+                'noAlbums' => __('No albums found in your Google Photos account.', 'wp-gallery-link'),
+                'importing' => __('Importing...', 'wp-gallery-link'),
+                'imported' => __('Imported', 'wp-gallery-link'),
+                'import' => __('Import', 'wp-gallery-link'),
+                'error_loading' => __('Error loading albums', 'wp-gallery-link'),
+                'import_error' => __('Error importing album', 'wp-gallery-link'),
+                'import_success' => __('Imported successfully', 'wp-gallery-link')
+            )
+        ));
+        
+        // Log that we've added the localization
+        $this->log('Admin scripts localized with nonce: ' . substr($debug_nonce, 0, 5) . '...', 'debug');
+    }
+    
     /**
      * Initialize plugin
      */
@@ -318,6 +355,9 @@ class WP_Gallery_Link {
         }
         
         $api = $this->google_api;
+        // Create a new nonce for this page
+        $debug_nonce = wp_create_nonce('wpgl_debug');
+        
         ?>
         <div class="wrap">
             <h1><?php echo esc_html(get_admin_page_title()); ?></h1>
@@ -370,8 +410,8 @@ class WP_Gallery_Link {
                                     <th><?php _e('Actions', 'wp-gallery-link'); ?></th>
                                     <td>
                                         <a href="<?php echo esc_url($api->get_auth_url()); ?>" class="button"><?php _e('Re-authorize', 'wp-gallery-link'); ?></a>
-                                        <button id="wpgl-refresh-token" class="button"><?php _e('Refresh Token', 'wp-gallery-link'); ?></button>
-                                        <button id="wpgl-test-api" class="button"><?php _e('Test API Connection', 'wp-gallery-link'); ?></button>
+                                        <button id="wpgl-refresh-token" class="button" data-nonce="<?php echo esc_attr($debug_nonce); ?>"><?php _e('Refresh Token', 'wp-gallery-link'); ?></button>
+                                        <button id="wpgl-test-api" class="button" data-nonce="<?php echo esc_attr($debug_nonce); ?>"><?php _e('Test API Connection', 'wp-gallery-link'); ?></button>
                                     </td>
                                 </tr>
                             </tbody>
@@ -453,10 +493,13 @@ class WP_Gallery_Link {
         
         <script>
         jQuery(document).ready(function($) {
+            var ajaxUrl = '<?php echo esc_url(admin_url('admin-ajax.php')); ?>';
+            var debugNonce = '<?php echo esc_js($debug_nonce); ?>';
+            
             $('#wpgl-refresh-log').on('click', function() {
-                $.post(ajaxurl, {
+                $.post(ajaxUrl, {
                     action: 'wpgl_get_debug_log',
-                    nonce: '<?php echo wp_create_nonce('wpgl_debug'); ?>'
+                    nonce: debugNonce
                 }, function(response) {
                     if (response.success) {
                         refreshLogTable(response.data.log);
@@ -468,9 +511,9 @@ class WP_Gallery_Link {
             
             $('#wpgl-clear-log').on('click', function() {
                 if (confirm('<?php _e('Are you sure you want to clear the log?', 'wp-gallery-link'); ?>')) {
-                    $.post(ajaxurl, {
+                    $.post(ajaxUrl, {
                         action: 'wpgl_clear_debug_log',
-                        nonce: '<?php echo wp_create_nonce('wpgl_debug'); ?>'
+                        nonce: debugNonce
                     }, function(response) {
                         if (response.success) {
                             $('#wpgl-log-table tbody').empty();
@@ -485,9 +528,9 @@ class WP_Gallery_Link {
             $('#wpgl-refresh-token').on('click', function() {
                 $(this).prop('disabled', true).text('<?php _e('Refreshing...', 'wp-gallery-link'); ?>');
                 
-                $.post(ajaxurl, {
+                $.post(ajaxUrl, {
                     action: 'wpgl_refresh_token',
-                    nonce: '<?php echo wp_create_nonce('wpgl_debug'); ?>'
+                    nonce: debugNonce
                 }, function(response) {
                     $('#wpgl-refresh-token').prop('disabled', false).text('<?php _e('Refresh Token', 'wp-gallery-link'); ?>');
                     
@@ -495,7 +538,7 @@ class WP_Gallery_Link {
                         alert('<?php _e('Token refreshed successfully', 'wp-gallery-link'); ?>');
                         location.reload();
                     } else {
-                        alert('<?php _e('Failed to refresh token', 'wp-gallery-link'); ?>: ' + response.data.message);
+                        alert('<?php _e('Failed to refresh token', 'wp-gallery-link'); ?>: ' + (response.data ? response.data.message : ''));
                     }
                 });
             });
@@ -503,20 +546,21 @@ class WP_Gallery_Link {
             $('#wpgl-test-api').on('click', function() {
                 $(this).prop('disabled', true).text('<?php _e('Testing...', 'wp-gallery-link'); ?>');
                 
-                $.post(ajaxurl, {
+                $.post(ajaxUrl, {
                     action: 'wpgl_test_api',
-                    nonce: '<?php echo wp_create_nonce('wpgl_debug'); ?>'
+                    nonce: debugNonce
                 }, function(response) {
                     $('#wpgl-test-api').prop('disabled', false).text('<?php _e('Test API Connection', 'wp-gallery-link'); ?>');
                     
                     if (response.success) {
                         alert('<?php _e('API connection successful', 'wp-gallery-link'); ?>');
                     } else {
-                        alert('<?php _e('API connection failed', 'wp-gallery-link'); ?>: ' + response.data.message);
+                        alert('<?php _e('API connection failed', 'wp-gallery-link'); ?>: ' + (response.data ? response.data.message : ''));
                     }
-                }).fail(function() {
+                }).fail(function(xhr, status, error) {
                     $('#wpgl-test-api').prop('disabled', false).text('<?php _e('Test API Connection', 'wp-gallery-link'); ?>');
-                    alert('<?php _e('Request failed', 'wp-gallery-link'); ?>');
+                    alert('<?php _e('Request failed', 'wp-gallery-link'); ?>: ' + error);
+                    console.error('AJAX error:', xhr.responseText);
                 });
             });
             

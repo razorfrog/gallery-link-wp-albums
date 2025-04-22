@@ -154,66 +154,129 @@ jQuery(document).ready(function($) {
     }
     
     /**
-     * Load albums from Google Photos
+     * ALTERNATIVE: Load albums from Google Photos using direct fetch
+     * This is a fallback method when the regular AJAX call isn't working
+     */
+    function loadAlbumsDirect() {
+        // Reset state before starting
+        resetLoadingState();
+        
+        // Show we're using alternate method
+        addLog('Using alternative loading method');
+        updateProgress(10, 'Initializing direct album fetch');
+        
+        var ajaxUrl = wpglAdmin.ajaxUrl || window.ajaxurl || '/wp-admin/admin-ajax.php';
+        var nonce = wpglAdmin.nonce || '';
+        
+        // Log verbose data about our request
+        debugLog('Direct fetch to: ' + ajaxUrl);
+        debugLog('Using nonce: ' + (nonce ? 'Available' : 'Missing!'));
+        addLog('Sending direct fetch to WordPress');
+        
+        // First check if API is working
+        updateProgress(20, 'Testing API connection');
+        
+        // Create form data for the request
+        var formData = new FormData();
+        formData.append('action', 'wpgl_test_api');
+        formData.append('nonce', nonce);
+        
+        fetch(ajaxUrl, {
+            method: 'POST',
+            body: formData,
+            credentials: 'same-origin'
+        })
+        .then(function(response) {
+            debugLog('API test raw response', response);
+            
+            if (!response.ok) {
+                throw new Error('API test failed with status: ' + response.status);
+            }
+            
+            return response.json();
+        })
+        .then(function(data) {
+            debugLog('API test response data', data);
+            
+            if (!data.success) {
+                throw new Error(data.data?.message || 'API test failed');
+            }
+            
+            addLog('API connection test successful');
+            updateProgress(40, 'API connection verified, fetching albums');
+            
+            // Now fetch albums
+            var albumFormData = new FormData();
+            albumFormData.append('action', 'wpgl_fetch_albums');
+            albumFormData.append('nonce', nonce);
+            
+            return fetch(ajaxUrl, {
+                method: 'POST',
+                body: albumFormData,
+                credentials: 'same-origin'
+            });
+        })
+        .then(function(response) {
+            debugLog('Album fetch raw response', response);
+            updateProgress(60, 'Album data received, processing');
+            
+            if (!response.ok) {
+                // Add the raw response text for debugging
+                return response.text().then(function(text) {
+                    debugLog('Raw error response', text);
+                    throw new Error('Album fetch failed with status: ' + response.status);
+                });
+            }
+            
+            return response.json();
+        })
+        .then(function(data) {
+            // Log the entire response for debugging
+            debugLog('Album fetch complete response', data);
+            
+            if (!data.success) {
+                throw new Error(data.data?.message || 'Album fetch failed');
+            }
+            
+            updateProgress(80, 'Processing ' + (data.data?.albums?.length || 0) + ' albums');
+            
+            // Verify we have albums
+            var albums = data.data?.albums || [];
+            if (albums.length === 0) {
+                addLog('No albums found in Google Photos account');
+            } else {
+                addLog('Successfully retrieved ' + albums.length + ' albums');
+            }
+            
+            // Render albums
+            updateProgress(100, 'Albums loaded successfully');
+            renderAlbums(albums);
+        })
+        .catch(function(error) {
+            console.error('Album fetch error:', error);
+            updateProgress(100, 'Error: ' + error.message);
+            addLog('ERROR: ' + error.message);
+            
+            // Show error in UI
+            $albumsGrid.html('<div class="notice notice-error"><p>Error loading albums: ' + error.message + '</p><p>Check the browser console and server logs for more details.</p></div>');
+            $albumsContainer.show();
+        });
+    }
+    
+    /**
+     * Load albums from Google Photos using AJAX
+     * This is the default method
      */
     $loadButton.on('click', function() {
         debugLog('Load albums button clicked');
-        resetLoadingState();
         
-        // Update progress
-        updateProgress(10, wpglAdmin.i18n.loading);
+        // Use our direct fetch method instead of the standard AJAX
+        loadAlbumsDirect();
         
-        // Debug info
-        debugLog('AJAX URL:', wpglAdmin.ajaxUrl);
-        debugLog('Nonce:', wpglAdmin.nonce);
-        addLog('Sending AJAX request to WordPress');
-        
-        // Make AJAX request
-        $.ajax({
-            url: wpglAdmin.ajaxUrl,
-            method: 'POST',
-            data: {
-                action: 'wpgl_fetch_albums',
-                nonce: wpglAdmin.nonce
-            },
-            success: function(response) {
-                debugLog('AJAX Response:', response);
-                updateProgress(100, 'Albums loaded successfully');
-                
-                if (response.success && response.data && response.data.albums) {
-                    addLog('Albums received: ' + (response.data.albums ? response.data.albums.length : 0));
-                    renderAlbums(response.data.albums);
-                } else {
-                    var errorMsg = 'Error: ' + (response.data && response.data.message ? response.data.message : 'Unknown error');
-                    console.error(errorMsg);
-                    addLog(errorMsg);
-                    $albumsContainer.hide();
-                }
-            },
-            error: function(xhr, status, error) {
-                console.error('AJAX Error:', {xhr: xhr, status: status, error: error});
-                updateProgress(100, 'Error loading albums');
-                var errorDetails = '';
-                
-                try {
-                    if (xhr.responseText) {
-                        var jsonResponse = JSON.parse(xhr.responseText);
-                        errorDetails = jsonResponse.message || xhr.responseText;
-                    } else {
-                        errorDetails = error || 'Server error';
-                    }
-                } catch (e) {
-                    errorDetails = xhr.responseText || error || 'Server error';
-                }
-                
-                console.error('Error details:', errorDetails);
-                addLog(wpglAdmin.i18n.error + ' ' + errorDetails);
-                $albumsContainer.hide();
-                
-                // Show the raw error response in the log
-                addLog('Raw response: ' + xhr.responseText);
-            }
-        });
+        // Add analytics event if available
+        if (typeof _paq !== 'undefined') {
+            _paq.push(['trackEvent', 'Albums', 'Load', 'Google Photos']);
+        }
     });
     
     /**
@@ -233,56 +296,56 @@ jQuery(document).ready(function($) {
         // Find album data
         var title = $albumElement.find('.wpgl-album-title').text();
         
-        // Make AJAX request to import
-        $.ajax({
-            url: wpglAdmin.ajaxUrl,
+        // Use fetch for import as well
+        var formData = new FormData();
+        formData.append('action', 'wpgl_import_album');
+        formData.append('nonce', wpglAdmin.nonce);
+        formData.append('album_id', albumId);
+        
+        fetch(wpglAdmin.ajaxUrl, {
             method: 'POST',
-            data: {
-                action: 'wpgl_import_album',
-                nonce: wpglAdmin.nonce,
-                album_id: albumId
-            },
-            success: function(response) {
-                debugLog('Import response:', response);
-                if (response.success) {
-                    addLog('Album "' + title + '" imported successfully');
-                    $button.text(wpglAdmin.i18n.imported)
-                           .removeClass('button-primary')
-                           .addClass('button-disabled');
-                    
-                    if (response.data && response.data.edit_url) {
-                        var $editLink = $('<a href="' + response.data.edit_url + '" class="button button-small">Edit</a>');
-                        $button.after(' ').after($editLink);
-                    }
-                } else {
-                    $button.prop('disabled', false).text(wpglAdmin.i18n.import);
-                    var errorMsg = wpglAdmin.i18n.error + ' ' + (response.data && response.data.message ? response.data.message : 'Unknown error');
-                    console.error(errorMsg);
-                    addLog(errorMsg);
-                    alert(errorMsg);
+            body: formData,
+            credentials: 'same-origin'
+        })
+        .then(function(response) {
+            debugLog('Import raw response', response);
+            
+            if (!response.ok) {
+                return response.text().then(function(text) {
+                    debugLog('Raw import error response', text);
+                    throw new Error('Import failed with status: ' + response.status);
+                });
+            }
+            
+            return response.json();
+        })
+        .then(function(response) {
+            debugLog('Import response:', response);
+            if (response.success) {
+                addLog('Album "' + title + '" imported successfully');
+                $button.text(wpglAdmin.i18n.imported)
+                       .removeClass('button-primary')
+                       .addClass('button-disabled');
+                
+                if (response.data && response.data.edit_url) {
+                    var $editLink = $('<a href="' + response.data.edit_url + '" class="button button-small">Edit</a>');
+                    $button.after(' ').after($editLink);
                 }
-            },
-            error: function(xhr, status, error) {
-                console.error('Import AJAX Error:', {xhr: xhr, status: status, error: error});
+            } else {
                 $button.prop('disabled', false).text(wpglAdmin.i18n.import);
-                
-                var errorDetails = '';
-                try {
-                    if (xhr.responseText) {
-                        var jsonResponse = JSON.parse(xhr.responseText);
-                        errorDetails = jsonResponse.message || xhr.responseText;
-                    } else {
-                        errorDetails = error || 'Server error';
-                    }
-                } catch (e) {
-                    errorDetails = xhr.responseText || error || 'Server error';
-                }
-                
-                var errorMsg = wpglAdmin.i18n.error + ' ' + errorDetails;
+                var errorMsg = wpglAdmin.i18n.error + ' ' + (response.data && response.data.message ? response.data.message : 'Unknown error');
+                console.error(errorMsg);
                 addLog(errorMsg);
-                addLog('Raw response: ' + xhr.responseText);
                 alert(errorMsg);
             }
+        })
+        .catch(function(error) {
+            console.error('Import Error:', error);
+            $button.prop('disabled', false).text(wpglAdmin.i18n.import);
+            
+            var errorMsg = wpglAdmin.i18n.error + ' ' + error.message;
+            addLog(errorMsg);
+            alert(errorMsg);
         });
     });
 
@@ -291,26 +354,30 @@ jQuery(document).ready(function($) {
         if (typeof wpglAdmin !== 'undefined' && wpglAdmin.ajaxUrl) {
             addLog('Testing API connection...');
             
-            $.ajax({
-                url: wpglAdmin.ajaxUrl,
+            var formData = new FormData();
+            formData.append('action', 'wpgl_test_api');
+            formData.append('nonce', wpglAdmin.nonce);
+            
+            fetch(wpglAdmin.ajaxUrl, {
                 method: 'POST',
-                data: {
-                    action: 'wpgl_test_api',
-                    nonce: wpglAdmin.nonce
-                },
-                success: function(response) {
-                    if (response.success) {
-                        addLog('API connection test: SUCCESS');
-                        addLog('API connection is working. You can now load albums.');
-                    } else {
-                        addLog('API connection test: FAILED');
-                        addLog('Error: ' + (response.data && response.data.message ? response.data.message : 'Unknown error'));
-                    }
-                },
-                error: function(xhr, status, error) {
-                    addLog('API connection test: ERROR');
-                    addLog('API connection failed. Check your API settings.');
+                body: formData,
+                credentials: 'same-origin'
+            })
+            .then(function(response) {
+                return response.json();
+            })
+            .then(function(response) {
+                if (response.success) {
+                    addLog('API connection test: SUCCESS');
+                    addLog('API connection is working. You can now load albums.');
+                } else {
+                    addLog('API connection test: FAILED');
+                    addLog('Error: ' + (response.data && response.data.message ? response.data.message : 'Unknown error'));
                 }
+            })
+            .catch(function(error) {
+                addLog('API connection test: ERROR');
+                addLog('API connection failed: ' + error.message);
             });
         }
     }

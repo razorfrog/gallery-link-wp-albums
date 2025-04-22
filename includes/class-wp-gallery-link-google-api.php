@@ -208,15 +208,19 @@ class WP_Gallery_Link_Google_API {
      * AJAX: Fetch albums
      */
     public function ajax_fetch_albums() {
-        // Check nonce
-        if (!check_ajax_referer('wpgl_debug', 'nonce', false)) {
-            wp_send_json_error(array('message' => __('Security check failed', 'wp-gallery-link')));
+        // Check nonce - improved to not exit if fails to allow for response
+        $valid_nonce = check_ajax_referer('wpgl_debug', 'nonce', false);
+        
+        if (!$valid_nonce) {
+            wp_gallery_link()->log('Album fetch nonce check failed', 'error', $_REQUEST);
+            wp_send_json_error(array('message' => __('Security check failed. Please refresh the page and try again.', 'wp-gallery-link')));
+            return;
         }
         
         // Check authorization
         if (!$this->is_authorized()) {
             if (!$this->refresh_access_token()) {
-                wp_send_json_error(array('message' => __('Not authorized with Google Photos', 'wp-gallery-link')));
+                wp_send_json_error(array('message' => __('Not authorized with Google Photos. Please reconnect your account.', 'wp-gallery-link')));
                 return;
             }
         }
@@ -224,18 +228,25 @@ class WP_Gallery_Link_Google_API {
         // Get page token from request
         $page_token = isset($_POST['page_token']) ? $_POST['page_token'] : '';
         
+        // Log that we're making the request with the current tokens
+        wp_gallery_link()->log('Fetching albums with token expiring at: ' . get_option('wpgl_google_token_expires', 0), 'info');
+        
         // Build API request
         $url = 'https://photoslibrary.googleapis.com/v1/albums';
         $args = array(
             'headers' => array(
                 'Authorization' => 'Bearer ' . get_option('wpgl_google_access_token'),
                 'Content-Type' => 'application/json'
-            )
+            ),
+            'timeout' => 30 // Increased timeout for slower connections
         );
         
         if (!empty($page_token)) {
             $url = add_query_arg('pageToken', $page_token, $url);
         }
+        
+        // Set a larger page size
+        $url = add_query_arg('pageSize', '50', $url);
         
         // Make API request
         wp_gallery_link()->log('Fetching albums from Google Photos', 'info', array('url' => $url));
@@ -252,10 +263,11 @@ class WP_Gallery_Link_Google_API {
         $body = json_decode(wp_remote_retrieve_body($response), true);
         $status_code = wp_remote_retrieve_response_code($response);
         
-        // Log the response
-        wp_gallery_link()->log('Album fetch response', 'debug', array(
+        // Log the raw response for debugging
+        wp_gallery_link()->log('Album fetch raw response', 'debug', array(
             'status' => $status_code,
-            'body' => $body
+            'headers' => wp_remote_retrieve_headers($response),
+            'body' => wp_remote_retrieve_body($response)
         ));
         
         // Check for API errors
@@ -290,10 +302,11 @@ class WP_Gallery_Link_Google_API {
                 );
             }
         } else {
-            wp_gallery_link()->log('No albums found in response', 'warning');
+            wp_gallery_link()->log('No albums found in response', 'warning', $body);
         }
         
         // Send response
+        wp_gallery_link()->log('Successfully returning ' . count($albums) . ' albums', 'info');
         wp_send_json_success(array(
             'albums' => $albums,
             'nextPageToken' => isset($body['nextPageToken']) ? $body['nextPageToken'] : ''
@@ -519,27 +532,41 @@ class WP_Gallery_Link_Google_API {
      * AJAX: Test API connection
      */
     public function ajax_test_api() {
-        // Check nonce
-        if (!check_ajax_referer('wpgl_debug', 'nonce', false)) {
-            wp_send_json_error(array('message' => __('Security check failed', 'wp-gallery-link')));
+        // Check nonce - improved to not exit if fails
+        $valid_nonce = check_ajax_referer('wpgl_debug', 'nonce', false);
+        
+        if (!$valid_nonce) {
+            wp_gallery_link()->log('API test nonce check failed', 'error', $_REQUEST);
+            wp_send_json_error(array('message' => __('Security check failed. Please refresh the page and try again.', 'wp-gallery-link')));
+            return;
         }
         
         // Check authorization
         if (!$this->is_authorized()) {
             if (!$this->refresh_access_token()) {
-                wp_send_json_error(array('message' => __('Not authorized with Google Photos', 'wp-gallery-link')));
+                wp_send_json_error(array('message' => __('Not authorized with Google Photos. Please reconnect your account.', 'wp-gallery-link')));
                 return;
             }
         }
+        
+        // Log token information
+        $expires = get_option('wpgl_google_token_expires', 0);
+        $access_token = get_option('wpgl_google_access_token', '');
+        $token_snippet = substr($access_token, 0, 10) . '...';
+        
+        wp_gallery_link()->log('Testing API with token: ' . $token_snippet, 'info', array(
+            'expires_in' => human_time_diff(time(), $expires),
+            'expired' => ($expires <= time() ? 'Yes' : 'No')
+        ));
         
         // Build API request
         $url = 'https://photoslibrary.googleapis.com/v1/albums?pageSize=1';
         $args = array(
             'headers' => array(
-                'Authorization' => 'Bearer ' . get_option('wpgl_google_access_token'),
+                'Authorization' => 'Bearer ' . $access_token,
                 'Content-Type' => 'application/json'
             ),
-            'timeout' => 15
+            'timeout' => 30
         );
         
         // Make API request
@@ -556,6 +583,13 @@ class WP_Gallery_Link_Google_API {
         // Parse response
         $body = json_decode(wp_remote_retrieve_body($response), true);
         $status_code = wp_remote_retrieve_response_code($response);
+        
+        // Log raw response
+        wp_gallery_link()->log('API test raw response', 'debug', array(
+            'status' => $status_code,
+            'headers' => wp_remote_retrieve_headers($response),
+            'body' => wp_remote_retrieve_body($response)
+        ));
         
         // Check for API errors
         if ($status_code !== 200) {
