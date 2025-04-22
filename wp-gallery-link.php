@@ -54,3 +54,4 @@ function wp_gallery_link_script_version($src) {
 }
 add_filter('script_loader_src', 'wp_gallery_link_script_version');
 add_filter('style_loader_src', 'wp_gallery_link_script_version');
+
