@@ -24,7 +24,7 @@ if (!defined('WP_GALLERY_LINK_URL')) {
 }
 
 if (!defined('WP_GALLERY_LINK_VERSION')) {
-    define('WP_GALLERY_LINK_VERSION', '1.0.0');
+    define('WP_GALLERY_LINK_VERSION', '1.0.1'); // Updated version number
 }
 
 // Load main plugin class and helpers
@@ -33,3 +33,28 @@ require_once WP_GALLERY_LINK_PATH . 'includes/functions-wp-gallery-link.php';
 
 // Initialize plugin
 add_action('plugins_loaded', 'wp_gallery_link');
+
+/**
+ * Add action to clear browser cache on version update
+ * This helps ensure JavaScript and CSS files are refreshed
+ */
+function wp_gallery_link_clear_cache() {
+    $current_version = get_option('wp_gallery_link_version', '0');
+    if (version_compare($current_version, WP_GALLERY_LINK_VERSION, '<')) {
+        update_option('wp_gallery_link_version', WP_GALLERY_LINK_VERSION);
+    }
+}
+add_action('admin_init', 'wp_gallery_link_clear_cache');
+
+/**
+ * Add version number to scripts and styles as query string
+ * This forces browsers to load fresh versions
+ */
+function wp_gallery_link_script_version($src) {
+    if (strpos($src, 'wp-gallery-link') !== false) {
+        $src = add_query_arg('ver', WP_GALLERY_LINK_VERSION . '.' . time(), $src);
+    }
+    return $src;
+}
+add_filter('script_loader_src', 'wp_gallery_link_script_version');
+add_filter('style_loader_src', 'wp_gallery_link_script_version');

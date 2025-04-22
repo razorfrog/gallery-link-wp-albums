@@ -1,3 +1,4 @@
+
 <?php
 /**
  * Google Photos API functionality
@@ -435,6 +436,13 @@ class WP_Gallery_Link_Google_API {
             return new WP_Error('api_error', $error_message);
         }
         
+        // Log the response for debugging
+        wp_gallery_link()->log('Album details fetched successfully', 'debug', array(
+            'album_id' => $album_id,
+            'title' => $body['title'],
+            'media_count' => isset($body['mediaItemsCount']) ? $body['mediaItemsCount'] : 0
+        ));
+        
         // Return album details
         return array(
             'id' => $body['id'],
@@ -462,10 +470,14 @@ class WP_Gallery_Link_Google_API {
         ));
 
         if (!empty($existing)) {
+            wp_gallery_link()->log('Album already exists in database', 'info', array(
+                'post_id' => $existing[0]->ID,
+                'album_id' => $album_data['id']
+            ));
             return $existing[0]->ID;
         }
 
-        // Create new post
+        // Create new post with the actual album title
         $post_id = wp_insert_post(array(
             'post_title' => $album_data['title'],
             'post_type' => 'gphoto_album',
@@ -508,6 +520,7 @@ class WP_Gallery_Link_Google_API {
             'post_id' => $post_id,
             'metadata' => array(
                 'album_id' => $album_data['id'],
+                'album_title' => $album_data['title'], // Log the actual title
                 'album_url' => !empty($album_data['productUrl']) ? $album_data['productUrl'] : '',
                 'album_date' => !empty($album_data['creationTime']) ? date('Y-m-d', strtotime($album_data['creationTime'])) : date('Y-m-d')
             )
