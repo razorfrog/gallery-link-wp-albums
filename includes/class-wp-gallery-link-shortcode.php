@@ -83,9 +83,27 @@ class WP_Gallery_Link_Shortcode {
                 
             case 'custom':
             default:
-                $query_args['orderby'] = 'meta_value_num';
+                // Modified: Use meta_query to include posts with and without the custom order field
+                $query_args['meta_query'] = array(
+                    'relation' => 'OR',
+                    // First get posts WITH the custom order field
+                    array(
+                        'key' => '_gphoto_album_order',
+                        'compare' => 'EXISTS',
+                    ),
+                    // Then get posts WITHOUT the custom order field
+                    array(
+                        'key' => '_gphoto_album_order',
+                        'compare' => 'NOT EXISTS',
+                    )
+                );
+                
+                // Sort by the meta value numerically
+                $query_args['orderby'] = array(
+                    'meta_value_num' => $atts['order'],
+                    'title' => 'ASC' // Secondary sort by title
+                );
                 $query_args['meta_key'] = '_gphoto_album_order';
-                $query_args['order'] = $atts['order'];
                 break;
         }
         
@@ -164,3 +182,4 @@ class WP_Gallery_Link_Shortcode {
         return ob_get_clean();
     }
 }
+
