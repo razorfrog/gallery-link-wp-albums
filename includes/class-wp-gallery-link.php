@@ -152,6 +152,33 @@ class WP_Gallery_Link {
 
         $this->log('WP Gallery Link: Fetching albums via AJAX', 'info');
 
+        // Check if we're in demo mode
+        $demo_mode = false;
+        
+        // Check for explicit demo parameter
+        if (isset($_POST['demo']) && $_POST['demo'] === 'true') {
+            $demo_mode = true;
+            $this->log('WP Gallery Link: Demo mode enabled via parameter', 'info');
+        }
+        
+        // Also check for the filter (which can be set via URL)
+        if (!$demo_mode) {
+            $demo_mode = apply_filters('wpgl_is_demo_mode', false);
+            if ($demo_mode) {
+                $this->log('WP Gallery Link: Demo mode enabled via filter', 'info');
+            }
+        }
+        
+        // If we're not in demo mode and we have a Google API instance, use it
+        if (!$demo_mode && isset($this->google_api) && method_exists($this->google_api, 'ajax_fetch_albums')) {
+            $this->log('WP Gallery Link: Using Google API to fetch albums', 'info');
+            $this->google_api->ajax_fetch_albums();
+            return;
+        }
+
+        // Otherwise fall back to demo mode
+        $this->log('WP Gallery Link: Using demo mode for albums', 'info');
+
         // Accept perPage as an argument, default 6 if not given (so UI can override)
         $per_page = isset($_POST['perPage']) ? intval($_POST['perPage']) : 6;
 
@@ -243,7 +270,7 @@ class WP_Gallery_Link {
             $next_page_token = '';
         }
 
-        $this->log('WP Gallery Link: Returning ' . count($albums) . ' albums (offset=' . $offset . ', per_page=' . $per_page . ') of ' . $total, 'info');
+        $this->log('WP Gallery Link: Returning ' . count($albums) . ' demo albums (offset=' . $offset . ', per_page=' . $per_page . ') of ' . $total, 'info');
 
         wp_send_json_success(array(
             'albums' => $albums,

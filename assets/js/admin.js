@@ -1,4 +1,3 @@
-
 jQuery(document).ready(function($) {
     'use strict';
     
@@ -30,7 +29,6 @@ jQuery(document).ready(function($) {
     logDebug('Admin script initialized');
     console.log('WP Gallery Link admin.js loaded successfully');
     console.log('Checking for wpglAdmin object:', typeof wpglAdmin !== 'undefined' ? 'Available' : 'Not available');
-    console.log('IMPORTANT: This version uses direct HTML rendering only - no templates');
     
     /**
      * Add a message to the loading log
@@ -70,10 +68,10 @@ jQuery(document).ready(function($) {
     }
     
     /**
-     * Render an album in the grid - Using direct HTML creation ONLY
+     * Render an album in the grid
      */
     function renderAlbum(album) {
-        logDebug('Rendering album using direct HTML creation:', album);
+        logDebug('Rendering album:', album);
         console.log('Rendering album with ID:', album.id, 'and title:', album.title);
 
         const $albumsGrid = $('.wpgl-albums-grid');
@@ -87,7 +85,7 @@ jQuery(document).ready(function($) {
         // Create a default cover image if one isn't provided
         const coverImageUrl = album.coverPhotoBaseUrl || 'https://via.placeholder.com/200x200?text=No+Cover';
         
-        // Create album HTML directly in JavaScript - NO TEMPLATES
+        // Create album HTML directly
         const albumHtml = `
             <div class="wpgl-album" data-id="${album.id}">
                 <div class="wpgl-album-cover-container">
@@ -162,7 +160,7 @@ jQuery(document).ready(function($) {
      */
     function loadAlbums() {
         logDebug('loadAlbums function called');
-        console.log('WP Gallery Link: loadAlbums function called - DIRECT HTML RENDERING VERSION');
+        console.log('WP Gallery Link: loadAlbums function called');
         
         if (cancelLoading) {
             addLoadingLog('Album loading canceled by user.');
@@ -170,7 +168,8 @@ jQuery(document).ready(function($) {
             return;
         }
         
-        const loadAllAlbums = typeof wpglAdmin !== 'undefined' && wpglAdmin.loadAllAlbums === true;
+        // Explicit disable demo mode for testing
+        const forceRealMode = true; // Always use real API data
         
         if (isLoading) {
             logDebug('Already loading albums, skipping duplicate request');
@@ -182,7 +181,8 @@ jQuery(document).ready(function($) {
         
         const data = {
             action: 'wpgl_fetch_albums',
-            nonce: wpglAdmin ? wpglAdmin.nonce : '' // Use the nonce from wpglAdmin if available
+            nonce: wpglAdmin ? wpglAdmin.nonce : '',
+            demo: 'false' // Always force real data
         };
         
         if (nextPageToken) {
@@ -200,7 +200,7 @@ jQuery(document).ready(function($) {
             processedPageTokens.push(nextPageToken);
         }
         
-        addLoadingLog('Fetching albums from Google Photos API using direct HTML rendering...');
+        addLoadingLog('Fetching albums from Google Photos API...');
         updateLoadingStatus('Fetching albums...');
         updateProgress(10);
         
@@ -239,51 +239,44 @@ jQuery(document).ready(function($) {
                     // Show the albums container
                     $('.wpgl-albums-container').show();
                     
-                    // Render each album directly with HTML generation
+                    // Render each album
                     albums.forEach(function(album) {
                         albumsFound.push(album);
                         addAlbumToList(album.title);
-                        renderAlbum(album);  // This uses direct HTML generation now
+                        renderAlbum(album);
                     });
                     
                     updateProgress(75);
                     
-                    // If there's a next page token and we're loading all albums, continue loading
-                    if (nextPageToken && loadAllAlbums) {
-                        addLoadingLog('Loading next batch of albums...');
-                        setTimeout(function() {
-                            loadAlbums();
-                        }, 1000);
-                    } else {
-                        addLoadingLog(`Finished loading ${totalAlbums} albums.`);
-                        updateProgress(100);
-                        isLoading = false;
+                    // If there's a next page token
+                    if (nextPageToken) {
+                        addLoadingLog('More albums available. Click "Load More" to fetch them.');
                         
-                        if (!nextPageToken) {
-                            addLoadingLog('No more albums available.');
-                        } else if (!loadAllAlbums) {
-                            addLoadingLog('Limited album loading completed. Click "Load Albums" again for more.');
+                        // Show "Load More" button
+                        if (!$('#wpgl-load-more').length) {
+                            $('.wpgl-button-group').append(`
+                                <button id="wpgl-load-more" class="button">
+                                    ${wpglAdmin.i18n ? wpglAdmin.i18n.load_more : 'Load More'}
+                                </button>
+                            `);
                             
-                            // Show "Load More" button
-                            if (!$('#wpgl-load-more').length) {
-                                $('.wpgl-button-group').append(`
-                                    <button id="wpgl-load-more" class="button">
-                                        ${wpglAdmin.i18n.load_more}
-                                    </button>
-                                `);
-                                
-                                // Setup load more handler
-                                $('#wpgl-load-more').on('click', function() {
-                                    $(this).hide();
-                                    loadAlbums();
-                                });
-                            } else {
-                                $('#wpgl-load-more').show();
-                            }
+                            // Setup load more handler
+                            $('#wpgl-load-more').on('click', function() {
+                                $(this).hide();
+                                loadAlbums();
+                            });
+                        } else {
+                            $('#wpgl-load-more').show();
                         }
-                        
-                        hideLoadingUI();
+                    } else {
+                        addLoadingLog('No more albums available.');
                     }
+                    
+                    addLoadingLog(`Finished loading ${totalAlbums} albums.`);
+                    updateProgress(100);
+                    isLoading = false;
+                    hideLoadingUI();
+                    
                 } else {
                     const errorMsg = response.data && response.data.message ? response.data.message : 'Unknown error';
                     console.error('API Error:', errorMsg, response);
@@ -540,62 +533,15 @@ jQuery(document).ready(function($) {
         bulkImportAlbums();
     });
     
-    // Debug button for demo loading
+    // Debug button for demo loading - DISABLED
     $('.wpgl-demo-mode a').on('click', function(e) {
-        logDebug('Demo mode requested');
-        if (!e.ctrlKey) {
-            logDebug('Demo mode active - showing sample albums');
-            // Let the link work normally to load demo albums
-        }
+        e.preventDefault(); // Prevent demo mode
+        logDebug('Demo mode requested but blocked');
+        alert('Demo mode has been disabled. The system will use real Google Photos API data.');
     });
-    
-    // Run diagnostic check on page load
-    function runDiagnostic() {
-        logDebug('Running diagnostic check...');
-        console.log('WP Gallery Link: Running diagnostic check...');
-        
-        // Debug information for templates
-        console.log('Checking for DOM elements...');
-        
-        // Check if we have the wpglAdmin object
-        if (typeof wpglAdmin === 'undefined') {
-            console.error('WP Gallery Link: wpglAdmin object not found. Script localization might have failed.');
-            return;
-        }
-        
-        // Check if we can find the start button
-        const startBtn = $('#wpgl-start-loading');
-        if (startBtn.length === 0) {
-            console.error('WP Gallery Link: Start button not found in DOM.');
-        } else {
-            console.log('WP Gallery Link: Start button found with ID:', startBtn.attr('id'));
-        }
-        
-        // Check if the album grid container exists
-        const albumsGrid = $('.wpgl-albums-grid');
-        if (albumsGrid.length === 0) {
-            console.error('WP Gallery Link: Albums grid container not found in DOM.');
-        } else {
-            console.log('WP Gallery Link: Albums grid found with class:', albumsGrid.attr('class'));
-        }
-        
-        // Display DOM structure for debugging
-        console.log('DOM structure of import page:');
-        $('.wpgl-import-container').each(function() {
-            console.log('Import container found');
-            $(this).children().each(function() {
-                console.log('- Child element:', this.tagName, this.className || '(no class)');
-            });
-        });
-        
-        logDebug('Diagnostic completed');
-    }
     
     // Run diagnostic on page load if in debug mode
     if (DEBUG) {
-        runDiagnostic();
-        // Add immediate diagnostic info to console
-        console.log('WP Gallery Link: Script loaded and ready');
         console.log('WP Gallery Link: Debug mode is active');
         if (typeof wpglAdmin !== 'undefined') {
             console.log('WP Gallery Link: wpglAdmin object is available', wpglAdmin);
@@ -604,51 +550,8 @@ jQuery(document).ready(function($) {
         }
     }
     
-    // Explicitly trigger rendering of demo albums for testing when demo mode is active
-    if (typeof wpglAdmin !== 'undefined' && wpglAdmin.demoMode === true) {
-        console.log('WP Gallery Link: Demo mode is active, will load sample albums automatically');
-        setTimeout(function() {
-            console.log('WP Gallery Link: Auto-triggering album load in demo mode');
-            if ($('#wpgl-start-loading').length) {
-                $('#wpgl-start-loading').trigger('click');
-            } else {
-                console.error('WP Gallery Link: Could not find start loading button to auto-trigger');
-                // Try to manually start loading
-                resetAlbumLoading();
-                loadAlbums();
-            }
-        }, 500);
-    }
-    
-    // Direct trigger for start button click handlers
-    $(document).on('ready', function() {
+    // Directly hook into document ready
+    $(document).ready(function() {
         console.log('WP Gallery Link: Document ready event fired');
-        $('#wpgl-start-loading').on('click', function(e) {
-            console.log('WP Gallery Link: Start loading button clicked');
-            e.preventDefault();
-            resetAlbumLoading();
-            loadAlbums();
-        });
-    });
-    
-    // Add direct event listener for the start button
-    document.addEventListener('DOMContentLoaded', function() {
-        if (document.getElementById('wpgl-start-loading')) {
-            document.getElementById('wpgl-start-loading').addEventListener('click', function(e) {
-                console.log('Start loading button clicked (via addEventListener)');
-                e.preventDefault();
-                resetAlbumLoading();
-                loadAlbums();
-            });
-        }
-        
-        // Auto-start in demo mode
-        if (typeof wpglAdmin !== 'undefined' && wpglAdmin.demoMode === true) {
-            console.log('WP Gallery Link: Demo mode is active, auto-starting album load');
-            setTimeout(function() {
-                resetAlbumLoading();
-                loadAlbums();
-            }, 500);
-        }
     });
 });

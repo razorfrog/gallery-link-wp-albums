@@ -1,4 +1,3 @@
-
 <?php
 /**
  * Plugin Name: Google Photos Albums
@@ -157,19 +156,16 @@ function wpgl_init_admin() {
             error_log('CRITICAL ERROR: Admin class not found');
         }
         
-        // Add action to enable demo mode via URL parameter
-        add_action('admin_init', 'wpgl_check_demo_mode');
+        // Add action to enable demo mode via URL parameter - explicitly disabled
+        // No longer hooking this action to prevent demo mode
     }
 }
 
-// Function to check if demo mode is enabled via URL
+// Function to check if demo mode is enabled via URL - Modified to ALWAYS return false
 function wpgl_check_demo_mode() {
-    if (isset($_GET['demo']) && $_GET['demo'] === 'true' && 
-        isset($_GET['page']) && $_GET['page'] === 'wp-gallery-link-import') {
-        // Force demo mode to be true
-        add_filter('wpgl_is_demo_mode', function() { return true; });
-        error_log('Demo mode enabled via URL parameter');
-    }
+    // Forcing demo mode to be false regardless of URL parameters
+    add_filter('wpgl_is_demo_mode', function() { return false; });
+    error_log('Demo mode explicitly disabled');
 }
 
 // Initialize admin functionality
@@ -254,6 +250,9 @@ function wpgl_check_templates_callback($request) {
     
     return new WP_REST_Response($results, 200);
 }
+
+// Disable demo mode explicitly
+add_filter('wpgl_is_demo_mode', '__return_false');
 
 // Log plugin initialization completion
 if (WP_GALLERY_LINK_DEBUG) {
