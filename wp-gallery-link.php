@@ -1,4 +1,3 @@
-
 <?php
 /**
  * Main plugin file for Google Photos Albums
