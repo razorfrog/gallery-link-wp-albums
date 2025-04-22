@@ -425,41 +425,37 @@ class WP_Gallery_Link_Google_API {
         // Check if album already exists
         $existing = get_posts(array(
             'post_type' => 'gphoto_album',
-            'meta_key' => 'wpgl_album_id',
+            'meta_key' => '_gphoto_album_id',
             'meta_value' => $album_data['id'],
             'posts_per_page' => 1
         ));
-        
-        if (!empty($existing)) {
-            $post_id = $existing[0]->ID;
-            wp_gallery_link()->log('Album already exists, updating: ' . $album_data['title'], 'info', array('post_id' => $post_id));
-        } else {
+
+        if (empty($existing)) {
             // Create new post
             $post_id = wp_insert_post(array(
                 'post_title' => $album_data['title'],
                 'post_type' => 'gphoto_album',
                 'post_status' => 'publish'
             ));
-            
-            if (is_wp_error($post_id)) {
-                return $post_id;
+
+            if ($post_id) {
+                // Save metadata with the correct keys
+                update_post_meta($post_id, '_gphoto_album_id', $album_data['id']);
+                
+                if (!empty($album_data['productUrl'])) {
+                    update_post_meta($post_id, '_gphoto_album_url', $album_data['productUrl']);
+                }
+                
+                if (!empty($album_data['creationTime'])) {
+                    $date = date('Y-m-d', strtotime($album_data['creationTime']));
+                    update_post_meta($post_id, '_gphoto_album_date', $date);
+                }
             }
-            
-            wp_gallery_link()->log('New album post created: ' . $album_data['title'], 'info', array('post_id' => $post_id));
+
+            return $post_id;
         }
-        
-        // Save album metadata
-        update_post_meta($post_id, 'wpgl_album_id', $album_data['id']);
-        update_post_meta($post_id, 'wpgl_media_count', $album_data['mediaItemsCount']);
-        update_post_meta($post_id, 'wpgl_cover_url', $album_data['coverPhotoBaseUrl']);
-        update_post_meta($post_id, 'wpgl_product_url', $album_data['productUrl']);
-        
-        // Set featured image if available
-        if (!empty($album_data['coverPhotoBaseUrl'])) {
-            $this->set_featured_image($post_id, $album_data['coverPhotoBaseUrl'], $album_data['title']);
-        }
-        
-        return $post_id;
+
+        return $existing[0]->ID;
     }
     
     /**
