@@ -12,6 +12,23 @@ jQuery(document).ready(function($) {
     var $progressBar = $('.wpgl-progress-value');
     var $loadingLog = $('.wpgl-loading-log');
     
+    // Debug mode
+    var debugMode = true;
+    
+    /**
+     * Log function with better debugging
+     */
+    function debugLog(message, data) {
+        if (debugMode) {
+            if (data) {
+                console.log('[WP Gallery Link Debug]', message, data);
+            } else {
+                console.log('[WP Gallery Link Debug]', message);
+            }
+            addLog('Debug: ' + message);
+        }
+    }
+    
     /**
      * Custom template rendering for environments where wp.template might not be available
      * (e.g., in the simulated demo environment)
@@ -83,16 +100,16 @@ jQuery(document).ready(function($) {
         
         if (albums.length === 0) {
             $albumsGrid.append('<div class="notice notice-info"><p>' + wpglAdmin.i18n.noAlbums + '</p></div>');
-            console.log('No albums to render');
+            debugLog('No albums to render');
             addLog('No albums found to display');
             return;
         }
         
-        console.log('Rendering ' + albums.length + ' albums', albums);
+        debugLog('Rendering ' + albums.length + ' albums', albums);
         addLog('Rendering ' + albums.length + ' albums');
         
         $.each(albums, function(index, album) {
-            console.log('Rendering album:', album);
+            debugLog('Rendering album:', album);
             var html = renderTemplate('wpgl-album', album);
             $albumsGrid.append(html);
         });
@@ -106,7 +123,7 @@ jQuery(document).ready(function($) {
      */
     function updateProgress(percent, message) {
         $progressBar.css('width', percent + '%');
-        console.log('Progress: ' + percent + '%' + (message ? ' - ' + message : ''));
+        debugLog('Progress: ' + percent + '%' + (message ? ' - ' + message : ''));
         
         if (message) {
             addLog(message);
@@ -132,7 +149,7 @@ jQuery(document).ready(function($) {
         $loadingLog.empty();
         $albumsContainer.hide();
         $loadingText.text(wpglAdmin.i18n.loading);
-        console.log('Reset loading state');
+        debugLog('Reset loading state');
         addLog('Starting album loading process');
     }
     
@@ -140,15 +157,15 @@ jQuery(document).ready(function($) {
      * Load albums from Google Photos
      */
     $loadButton.on('click', function() {
-        console.log('Load albums button clicked');
+        debugLog('Load albums button clicked');
         resetLoadingState();
         
         // Update progress
         updateProgress(10, wpglAdmin.i18n.loading);
         
         // Debug info
-        console.log('AJAX URL:', wpglAdmin.ajaxUrl);
-        console.log('Nonce:', wpglAdmin.nonce);
+        debugLog('AJAX URL:', wpglAdmin.ajaxUrl);
+        debugLog('Nonce:', wpglAdmin.nonce);
         addLog('Sending AJAX request to WordPress');
         
         // Make AJAX request
@@ -160,14 +177,14 @@ jQuery(document).ready(function($) {
                 nonce: wpglAdmin.nonce
             },
             success: function(response) {
-                console.log('AJAX Response:', response);
+                debugLog('AJAX Response:', response);
                 updateProgress(100, 'Albums loaded successfully');
                 
                 if (response.success && response.data && response.data.albums) {
                     addLog('Albums received: ' + (response.data.albums ? response.data.albums.length : 0));
                     renderAlbums(response.data.albums);
                 } else {
-                    var errorMsg = 'Error: ' + (response.data ? response.data.message : 'Unknown error');
+                    var errorMsg = 'Error: ' + (response.data && response.data.message ? response.data.message : 'Unknown error');
                     console.error(errorMsg);
                     addLog(errorMsg);
                     $albumsContainer.hide();
@@ -192,6 +209,9 @@ jQuery(document).ready(function($) {
                 console.error('Error details:', errorDetails);
                 addLog(wpglAdmin.i18n.error + ' ' + errorDetails);
                 $albumsContainer.hide();
+                
+                // Show the raw error response in the log
+                addLog('Raw response: ' + xhr.responseText);
             }
         });
     });
@@ -207,7 +227,7 @@ jQuery(document).ready(function($) {
         // Disable button
         $button.prop('disabled', true).text(wpglAdmin.i18n.importing);
         
-        console.log('Importing album:', albumId);
+        debugLog('Importing album:', albumId);
         addLog('Importing album ID: ' + albumId);
         
         // Find album data
@@ -223,7 +243,7 @@ jQuery(document).ready(function($) {
                 album_id: albumId
             },
             success: function(response) {
-                console.log('Import response:', response);
+                debugLog('Import response:', response);
                 if (response.success) {
                     addLog('Album "' + title + '" imported successfully');
                     $button.text(wpglAdmin.i18n.imported)
@@ -236,7 +256,7 @@ jQuery(document).ready(function($) {
                     }
                 } else {
                     $button.prop('disabled', false).text(wpglAdmin.i18n.import);
-                    var errorMsg = wpglAdmin.i18n.error + ' ' + (response.data ? response.data.message : 'Unknown error');
+                    var errorMsg = wpglAdmin.i18n.error + ' ' + (response.data && response.data.message ? response.data.message : 'Unknown error');
                     console.error(errorMsg);
                     addLog(errorMsg);
                     alert(errorMsg);
@@ -245,20 +265,67 @@ jQuery(document).ready(function($) {
             error: function(xhr, status, error) {
                 console.error('Import AJAX Error:', {xhr: xhr, status: status, error: error});
                 $button.prop('disabled', false).text(wpglAdmin.i18n.import);
-                var errorMsg = wpglAdmin.i18n.error + ' ' + (xhr.responseText || 'Server error');
+                
+                var errorDetails = '';
+                try {
+                    if (xhr.responseText) {
+                        var jsonResponse = JSON.parse(xhr.responseText);
+                        errorDetails = jsonResponse.message || xhr.responseText;
+                    } else {
+                        errorDetails = error || 'Server error';
+                    }
+                } catch (e) {
+                    errorDetails = xhr.responseText || error || 'Server error';
+                }
+                
+                var errorMsg = wpglAdmin.i18n.error + ' ' + errorDetails;
                 addLog(errorMsg);
+                addLog('Raw response: ' + xhr.responseText);
                 alert(errorMsg);
             }
         });
     });
 
-    // For demo purposes - auto-load albums after a short delay
+    // Test API connectivity directly on page load
+    function testApiConnection() {
+        if (typeof wpglAdmin !== 'undefined' && wpglAdmin.ajaxUrl) {
+            addLog('Testing API connection...');
+            
+            $.ajax({
+                url: wpglAdmin.ajaxUrl,
+                method: 'POST',
+                data: {
+                    action: 'wpgl_test_api',
+                    nonce: wpglAdmin.nonce
+                },
+                success: function(response) {
+                    if (response.success) {
+                        addLog('API connection test: SUCCESS');
+                        addLog('API connection is working. You can now load albums.');
+                    } else {
+                        addLog('API connection test: FAILED');
+                        addLog('Error: ' + (response.data && response.data.message ? response.data.message : 'Unknown error'));
+                    }
+                },
+                error: function(xhr, status, error) {
+                    addLog('API connection test: ERROR');
+                    addLog('API connection failed. Check your API settings.');
+                }
+            });
+        }
+    }
+    
+    // For auto-loading albums after a short delay
     if (window.location.href.indexOf('page=wp-gallery-link-import') > -1) {
-        console.log('On import page, auto-loading albums');
+        debugLog('On import page, running API test');
         setTimeout(function() {
-            console.log('Auto-clicking load button');
-            addLog('Auto-loading albums');
-            $loadButton.trigger('click');
-        }, 1000);
+            testApiConnection();
+            
+            setTimeout(function() {
+                debugLog('Auto-clicking load button');
+                addLog('Auto-loading albums');
+                $loadButton.trigger('click');
+            }, 1000);
+        }, 500);
     }
 });
