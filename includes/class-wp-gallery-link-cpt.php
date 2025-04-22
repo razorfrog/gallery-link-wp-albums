@@ -66,6 +66,13 @@ class WP_Gallery_Link_CPT {
     }
     
     /**
+     * Alias for register_post_type to maintain backward compatibility
+     */
+    public function register_post_types() {
+        return $this->register_post_type();
+    }
+    
+    /**
      * Register taxonomy for album categories
      */
     public function register_taxonomy() {

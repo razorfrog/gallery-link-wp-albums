@@ -1,4 +1,3 @@
-
 <?php
 /**
  * Main plugin class for Google Photos Albums
@@ -43,6 +42,12 @@ class WP_Gallery_Link {
      * Initialize the plugin
      */
     public function __construct() {
+        // Make sure we're initializing after plugins_loaded
+        if (!did_action('plugins_loaded')) {
+            error_log('WP Gallery Link: Attempted to initialize before plugins_loaded. Please make sure it is called after the plugins_loaded filter.');
+            return;
+        }
+        
         if (WP_GALLERY_LINK_DEBUG) {
             $this->log('WP Gallery Link: Main class initialized', 'info');
         }
