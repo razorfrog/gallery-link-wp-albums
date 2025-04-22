@@ -1,4 +1,3 @@
-
 /**
  * Admin JavaScript for WP Gallery Link
  */
@@ -32,6 +31,9 @@
         
         // Delegate events for dynamically created elements
         $albumsContainer.on('click', '.wpgl-import-album', importAlbum);
+        
+        // Debug info
+        console.log('WP Gallery Link admin.js initialized');
     }
     
     /**
@@ -46,6 +48,38 @@
         $loadingIndicator.show();
         $loadMoreButton.hide();
         
+        // Debug info
+        console.log('Loading albums, pageToken:', pageToken);
+        
+        // For demo/testing purposes, simulate successful API response
+        if (window.location.href.indexOf('demo=true') > -1) {
+            console.log('DEMO MODE: Simulating album data');
+            setTimeout(function() {
+                var demoData = {
+                    success: true,
+                    data: {
+                        albums: [
+                            {
+                                id: 'album1',
+                                title: 'Summer Vacation',
+                                mediaItemsCount: 42,
+                                coverPhotoBaseUrl: '/placeholder.svg'
+                            },
+                            {
+                                id: 'album2',
+                                title: 'Family Gathering',
+                                mediaItemsCount: 78,
+                                coverPhotoBaseUrl: '/placeholder.svg'
+                            }
+                        ],
+                        nextPageToken: 'demo-next-page'
+                    }
+                };
+                handleAlbumResponse(demoData);
+            }, 1000);
+            return;
+        }
+        
         $.ajax({
             url: wpgl_vars.ajaxurl,
             type: 'POST',
@@ -55,33 +89,49 @@
                 nonce: wpgl_vars.nonce
             },
             success: function(response) {
-                if (response.success) {
-                    var data = response.data;
-                    
-                    // Store the next page token
-                    pageToken = data.nextPageToken || '';
-                    
-                    // Render albums
-                    if (data.albums && data.albums.length > 0) {
-                        renderAlbums(data.albums);
-                    }
-                    
-                    // Show/hide load more button
-                    if (pageToken) {
-                        $loadMoreButton.show();
-                    }
-                } else {
-                    showError(response.data || wpgl_vars.i18n.error_loading);
-                }
+                console.log('API Response:', response);
+                handleAlbumResponse(response);
             },
             error: function(xhr, status, error) {
+                console.error('API Error:', error);
                 showError(wpgl_vars.i18n.error_loading + ' ' + error);
-            },
-            complete: function() {
                 isLoading = false;
                 $loadingIndicator.hide();
             }
         });
+    }
+    
+    /**
+     * Handle album API response
+     * 
+     * @param {Object} response The API response
+     */
+    function handleAlbumResponse(response) {
+        if (response.success) {
+            var data = response.data;
+            
+            // Store the next page token
+            pageToken = data.nextPageToken || '';
+            
+            // Render albums
+            if (data.albums && data.albums.length > 0) {
+                renderAlbums(data.albums);
+            } else {
+                if ($albumsContainer.children().length === 0) {
+                    $albumsContainer.html('<p>No albums found in your Google Photos account.</p>');
+                }
+            }
+            
+            // Show/hide load more button
+            if (pageToken) {
+                $loadMoreButton.show();
+            }
+        } else {
+            showError(response.data || wpgl_vars.i18n.error_loading);
+        }
+        
+        isLoading = false;
+        $loadingIndicator.hide();
     }
     
     /**
