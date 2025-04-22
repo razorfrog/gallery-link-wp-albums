@@ -391,45 +391,6 @@ class WP_Gallery_Link_Admin {
                 </div>
             </div>
         </div>
-        
-        <script type="text/html" id="tmpl-wpgl-album-item">
-            <div class="wpgl-album-item" data-id="{{ data.id }}">
-                <div class="wpgl-album-thumbnail">
-                    <# if (data.coverPhotoBaseUrl) { #>
-                        <img src="{{ data.coverPhotoBaseUrl }}=w200-h200" alt="{{ data.title }}">
-                    <# } else { #>
-                        <div class="wpgl-no-thumbnail"><?php _e('No Cover', 'wp-gallery-link'); ?></div>
-                    <# } #>
-                </div>
-                
-                <div class="wpgl-album-details">
-                    <h3 class="wpgl-album-title">{{ data.title }}</h3>
-                    
-                    <div class="wpgl-album-meta">
-                        <# if (data.mediaItemsCount) { #>
-                            <span class="wpgl-album-count">
-                                {{ data.mediaItemsCount }} <?php _e('items', 'wp-gallery-link'); ?>
-                            </span>
-                        <# } #>
-                    </div>
-                    
-                    <div class="wpgl-album-actions">
-                        <# if (data.imported) { #>
-                            <a href="{{ data.editLink }}" class="button button-secondary">
-                                <?php _e('Edit', 'wp-gallery-link'); ?>
-                            </a>
-                            <a href="{{ data.viewLink }}" class="button button-secondary" target="_blank">
-                                <?php _e('View', 'wp-gallery-link'); ?>
-                            </a>
-                        <# } else { #>
-                            <button class="button button-primary wpgl-import-album" data-id="{{ data.id }}">
-                                <?php _e('Import', 'wp-gallery-link'); ?>
-                            </button>
-                        <# } #>
-                    </div>
-                </div>
-            </div>
-        </script>
         <?php
     }
     

@@ -66,8 +66,6 @@ jQuery(document).ready(function($) {
      * Render an album in the grid
      */
     function renderAlbum(album) {
-        // Fix: Don't use wp.template which is causing the raw template code to appear
-        // Instead, render the album HTML directly
         const $albumsGrid = $('.wpgl-albums-grid');
         
         if ($albumsGrid.length) {
@@ -129,6 +127,7 @@ jQuery(document).ready(function($) {
         // Clear UI elements
         $('.wpgl-loading-log').empty();
         $('#wpgl-albums-title-list').empty();
+        $('.wpgl-albums-grid').empty(); // Clear the albums grid
         updateProgress(0);
     }
     
@@ -364,14 +363,6 @@ jQuery(document).ready(function($) {
             console.error('WP Gallery Link: Start button not found in DOM.');
         } else {
             logDebug('Start button found with ID:', startBtn.attr('id'));
-        }
-        
-        // Check if template exists
-        const template = $('#tmpl-wpgl-album');
-        if (template.length === 0) {
-            console.error('WP Gallery Link: Album template not found.');
-        } else {
-            logDebug('Album template found');
         }
         
         logDebug('Diagnostic completed');

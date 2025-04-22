@@ -1,3 +1,4 @@
+
 <?php
 /**
  * Main plugin file for Google Photos Albums
@@ -51,34 +52,15 @@ class WP_Gallery_Link {
             $this->log('WP Gallery Link: Main class initialized', 'info');
         }
         
-        // Locate and load the CPT class
-        $cpt_class_loaded = false;
-        
-        // Try different possible file paths
-        $possible_cpt_paths = array(
-            WP_GALLERY_LINK_PATH . 'includes/class-wp-gallery-link-cpt.php',
-            WP_GALLERY_LINK_PATH . 'src/includes/class-wp-gallery-link-cpt.php'
-        );
-        
-        foreach ($possible_cpt_paths as $path) {
-            if (file_exists($path)) {
-                require_once $path;
-                $this->log('WP Gallery Link: CPT class file included from ' . $path, 'info');
-                $cpt_class_loaded = true;
-                break;
-            }
-        }
-        
-        if (!$cpt_class_loaded && !class_exists('WP_Gallery_Link_CPT')) {
-            $this->log('WP Gallery Link: Could not find CPT class file', 'error');
-            add_action('admin_notices', function() {
-                echo '<div class="error"><p>Google Photos Albums: Critical error - Could not find CPT class file.</p></div>';
-            });
-            return;
-        }
-        
         // Initialize CPT
-        $this->cpt = new WP_Gallery_Link_CPT();
+        if (class_exists('WP_Gallery_Link_CPT')) {
+            $this->cpt = new WP_Gallery_Link_CPT();
+        } else {
+            $this->log('WP Gallery Link: CPT class not found', 'error');
+            add_action('admin_notices', function() {
+                echo '<div class="error"><p>Google Photos Albums: Critical error - Could not find CPT class.</p></div>';
+            });
+        }
         
         // Load Google API class
         $google_api_loaded = false;
@@ -95,8 +77,10 @@ class WP_Gallery_Link {
                 $this->log('WP Gallery Link: Google API class file included from ' . $path, 'info');
                 
                 // Initialize Google API
-                $this->google_api = new WP_Gallery_Link_Google_API();
-                $google_api_loaded = true;
+                if (class_exists('WP_Gallery_Link_Google_API')) {
+                    $this->google_api = new WP_Gallery_Link_Google_API();
+                    $google_api_loaded = true;
+                }
                 break;
             }
         }
@@ -110,6 +94,7 @@ class WP_Gallery_Link {
         }
         
         // Setup AJAX hooks
+        add_action('wp_ajax_wpgl_fetch_albums', array($this, 'ajax_fetch_albums'));
         add_action('wp_ajax_wpgl_import_album', array($this, 'ajax_import_album'));
     }
     
@@ -147,6 +132,59 @@ class WP_Gallery_Link {
     }
     
     /**
+     * AJAX handler for fetching albums
+     */
+    public function ajax_fetch_albums() {
+        // Check nonce
+        if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'wpgl_nonce')) {
+            $this->log('WP Gallery Link: Nonce verification failed', 'error');
+            wp_send_json_error(array('message' => __('Security check failed', 'wp-gallery-link')));
+            return;
+        }
+        
+        $this->log('WP Gallery Link: Fetching albums via AJAX', 'info');
+        
+        // For demo purposes, we'll return some sample albums
+        $sample_albums = array(
+            array(
+                'id' => 'album1',
+                'title' => 'Sample Album 1',
+                'productUrl' => 'https://photos.google.com/album/sample1',
+                'mediaItemsCount' => 25,
+                'coverPhotoBaseUrl' => 'https://via.placeholder.com/200x200?text=Album1'
+            ),
+            array(
+                'id' => 'album2',
+                'title' => 'Sample Album 2',
+                'productUrl' => 'https://photos.google.com/album/sample2',
+                'mediaItemsCount' => 15,
+                'coverPhotoBaseUrl' => 'https://via.placeholder.com/200x200?text=Album2'
+            ),
+            array(
+                'id' => 'album3',
+                'title' => 'Sample Album 3',
+                'productUrl' => 'https://photos.google.com/album/sample3',
+                'mediaItemsCount' => 42,
+                'coverPhotoBaseUrl' => 'https://via.placeholder.com/200x200?text=Album3'
+            ),
+            array(
+                'id' => 'album4',
+                'title' => 'Sample Album 4',
+                'productUrl' => 'https://photos.google.com/album/sample4',
+                'mediaItemsCount' => 8,
+                'coverPhotoBaseUrl' => 'https://via.placeholder.com/200x200?text=Album4'
+            )
+        );
+        
+        $this->log('WP Gallery Link: Returning ' . count($sample_albums) . ' sample albums', 'info');
+        
+        wp_send_json_success(array(
+            'albums' => $sample_albums,
+            'nextPageToken' => isset($_POST['pageToken']) ? '' : 'sample_token'
+        ));
+    }
+    
+    /**
      * AJAX handler for album import
      */
     public function ajax_import_album() {
@@ -181,39 +219,44 @@ class WP_Gallery_Link {
         
         $this->log('WP Gallery Link: Album data prepared - Title: ' . $album_data['title'], 'info');
         
-        // Create album post
-        $post_id = $this->cpt->create_album_from_google($album_data);
-        
-        if (is_wp_error($post_id)) {
-            $this->log('WP Gallery Link: Error creating album post - ' . $post_id->get_error_message(), 'error');
+        // Create album post if CPT class is available
+        if (isset($this->cpt) && method_exists($this->cpt, 'create_album_from_google')) {
+            $post_id = $this->cpt->create_album_from_google($album_data);
             
-            if ($post_id->get_error_code() === 'album_exists') {
-                $error_data = $post_id->get_error_data();
-                $edit_url = get_edit_post_link($error_data['post_id'], '');
-                $this->log('WP Gallery Link: Album already exists - Post ID ' . $error_data['post_id'], 'info');
+            if (is_wp_error($post_id)) {
+                $this->log('WP Gallery Link: Error creating album post - ' . $post_id->get_error_message(), 'error');
                 
-                wp_send_json_success(array(
-                    'message' => __('Album already exists', 'wp-gallery-link'),
-                    'post_id' => $error_data['post_id'],
-                    'edit_url' => $edit_url,
-                    'view_url' => get_permalink($error_data['post_id']),
-                ));
-            } else {
-                wp_send_json_error(array('message' => $post_id->get_error_message()));
+                if ($post_id->get_error_code() === 'album_exists') {
+                    $error_data = $post_id->get_error_data();
+                    $edit_url = get_edit_post_link($error_data['post_id'], '');
+                    $this->log('WP Gallery Link: Album already exists - Post ID ' . $error_data['post_id'], 'info');
+                    
+                    wp_send_json_success(array(
+                        'message' => __('Album already exists', 'wp-gallery-link'),
+                        'post_id' => $error_data['post_id'],
+                        'edit_url' => $edit_url,
+                        'view_url' => get_permalink($error_data['post_id']),
+                    ));
+                } else {
+                    wp_send_json_error(array('message' => $post_id->get_error_message()));
+                }
+                return;
             }
-            return;
+            
+            // Log successful album import
+            $this->log('WP Gallery Link: Successfully imported album - Post ID ' . $post_id, 'info');
+            
+            // Success response
+            wp_send_json_success(array(
+                'message' => __('Album imported successfully', 'wp-gallery-link'),
+                'post_id' => $post_id,
+                'edit_url' => get_edit_post_link($post_id, ''),
+                'view_url' => get_permalink($post_id),
+            ));
+        } else {
+            $this->log('WP Gallery Link: CPT class or method not available', 'error');
+            wp_send_json_error(array('message' => __('Plugin error: Custom post type handler not available', 'wp-gallery-link')));
         }
-        
-        // Log successful album import
-        $this->log('WP Gallery Link: Successfully imported album - Post ID ' . $post_id, 'info');
-        
-        // Success response
-        wp_send_json_success(array(
-            'message' => __('Album imported successfully', 'wp-gallery-link'),
-            'post_id' => $post_id,
-            'edit_url' => get_edit_post_link($post_id, ''),
-            'view_url' => get_permalink($post_id),
-        ));
     }
 }
 

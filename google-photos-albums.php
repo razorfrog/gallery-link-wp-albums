@@ -1,3 +1,4 @@
+
 <?php
 /**
  * Plugin Name: Google Photos Albums
@@ -26,21 +27,23 @@ if (WP_GALLERY_LINK_DEBUG) {
 }
 
 // Include the necessary files
-// Check if files exist before requiring them
+// First check in the includes directory
 if (file_exists(WP_GALLERY_LINK_PATH . 'includes/class-wp-gallery-link-cpt.php')) {
     require_once WP_GALLERY_LINK_PATH . 'includes/class-wp-gallery-link-cpt.php';
-} else if (file_exists(WP_GALLERY_LINK_PATH . 'src/includes/class-wp-gallery-link-cpt.php')) {
-    require_once WP_GALLERY_LINK_PATH . 'src/includes/class-wp-gallery-link-cpt.php';
 } else {
-    error_log('Critical error: class-wp-gallery-link-cpt.php not found in either includes/ or src/includes/ directories');
+    error_log('Critical error: class-wp-gallery-link-cpt.php not found in includes directory');
 }
 
 if (file_exists(WP_GALLERY_LINK_PATH . 'includes/class-wp-gallery-link-admin.php')) {
     require_once WP_GALLERY_LINK_PATH . 'includes/class-wp-gallery-link-admin.php';
-} else if (file_exists(WP_GALLERY_LINK_PATH . 'src/includes/class-wp-gallery-link-admin.php')) {
-    require_once WP_GALLERY_LINK_PATH . 'src/includes/class-wp-gallery-link-admin.php';
 } else {
-    error_log('Warning: class-wp-gallery-link-admin.php not found in either includes/ or src/includes/ directories');
+    error_log('Warning: class-wp-gallery-link-admin.php not found in includes directory');
+}
+
+if (file_exists(WP_GALLERY_LINK_PATH . 'includes/class-wp-gallery-link-shortcode.php')) {
+    require_once WP_GALLERY_LINK_PATH . 'includes/class-wp-gallery-link-shortcode.php';
+} else {
+    error_log('Warning: class-wp-gallery-link-shortcode.php not found in includes directory');
 }
 
 // Load the main plugin file
@@ -50,3 +53,6 @@ require_once WP_GALLERY_LINK_PATH . 'wp-gallery-link.php';
 if (is_admin()) {
     $wp_gallery_link_admin = new WP_Gallery_Link_Admin();
 }
+
+// Initialize shortcode functionality
+$wp_gallery_link_shortcode = new WP_Gallery_Link_Shortcode();
