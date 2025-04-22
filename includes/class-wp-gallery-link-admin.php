@@ -190,7 +190,19 @@ class WP_Gallery_Link_Admin {
             return;
         }
         
-        $google_api = wp_gallery_link()->google_api;
+        // Get google_api safely - check if the property exists
+        $main = wp_gallery_link();
+        $is_connected = false;
+        $auth_url = '#';
+        
+        if (isset($main->google_api)) {
+            if (method_exists($main->google_api, 'is_connected')) {
+                $is_connected = $main->google_api->is_connected();
+            }
+            if (method_exists($main->google_api, 'get_auth_url')) {
+                $auth_url = $main->google_api->get_auth_url();
+            }
+        }
         ?>
         <div class="wrap">
             <h1><?php echo esc_html(get_admin_page_title()); ?></h1>
@@ -225,7 +237,7 @@ class WP_Gallery_Link_Admin {
                 <div class="wpgl-section">
                     <h2><?php _e('Google Photos Connection', 'wp-gallery-link'); ?></h2>
                     
-                    <?php if ($google_api->is_connected()): ?>
+                    <?php if ($is_connected): ?>
                         <p class="wpgl-connected">
                             <span class="dashicons dashicons-yes-alt"></span>
                             <?php _e('Connected to Google Photos', 'wp-gallery-link'); ?>
@@ -236,7 +248,7 @@ class WP_Gallery_Link_Admin {
                                 <?php _e('Import Albums', 'wp-gallery-link'); ?>
                             </a>
                             
-                            <a href="<?php echo esc_url($google_api->get_auth_url()); ?>" class="button">
+                            <a href="<?php echo esc_url($auth_url); ?>" class="button">
                                 <?php _e('Reconnect', 'wp-gallery-link'); ?>
                             </a>
                         </p>
@@ -246,9 +258,9 @@ class WP_Gallery_Link_Admin {
                             <?php _e('Not connected to Google Photos', 'wp-gallery-link'); ?>
                         </p>
                         
-                        <?php if (!empty($google_api->get_auth_url())): ?>
+                        <?php if (!empty($auth_url) && $auth_url !== '#'): ?>
                             <p>
-                                <a href="<?php echo esc_url($google_api->get_auth_url()); ?>" class="button button-primary">
+                                <a href="<?php echo esc_url($auth_url); ?>" class="button button-primary">
                                     <?php _e('Connect to Google Photos', 'wp-gallery-link'); ?>
                                 </a>
                             </p>
@@ -293,23 +305,33 @@ class WP_Gallery_Link_Admin {
         if (!current_user_can('manage_options')) {
             return;
         }
-
-        $google_api = wp_gallery_link()->google_api;
-
-        if (!$google_api->is_connected()) {
-            wp_redirect(admin_url('admin.php?page=wp-gallery-link'));
-            exit;
+        
+        // Get google_api safely
+        $main = wp_gallery_link();
+        $is_connected = false;
+        
+        if (isset($main->google_api) && method_exists($main->google_api, 'is_connected')) {
+            $is_connected = $main->google_api->is_connected();
         }
-
-        // Check if we've just imported an album
-        $album_imported = isset($_GET['imported']) ? absint($_GET['imported']) : 0;
+        
+        // Let's not redirect away just yet for debugging purposes
+        if (!$is_connected && !isset($_GET['demo'])) {
+            // For now, just show a notice instead of redirecting
+            // wp_redirect(admin_url('admin.php?page=wp-gallery-link'));
+            // exit;
+        }
         ?>
         <div class="wrap">
             <h1><?php _e('Import Albums from Google Photos', 'wp-gallery-link'); ?></h1>
-
-            <?php if ($album_imported > 0): ?>
-                <div class="notice notice-success is-dismissible">
-                    <p><?php _e('Album imported successfully!', 'wp-gallery-link'); ?></p>
+            
+            <?php if (!$is_connected && !isset($_GET['demo'])): ?>
+                <div class="notice notice-warning">
+                    <p>
+                        <?php _e('You are not connected to Google Photos. Some features may not work properly.', 'wp-gallery-link'); ?>
+                        <a href="<?php echo esc_url(admin_url('admin.php?page=wp-gallery-link')); ?>" class="button button-small">
+                            <?php _e('Go to Settings', 'wp-gallery-link'); ?>
+                        </a>
+                    </p>
                 </div>
             <?php endif; ?>
 
@@ -354,27 +376,57 @@ class WP_Gallery_Link_Admin {
                     <h2><?php _e('Available Albums', 'wp-gallery-link'); ?></h2>
                     <div class="wpgl-albums-grid"></div>
                 </div>
+
+                <div class="wpgl-demo-mode" style="margin-top: 30px;">
+                    <p>
+                        <strong><?php _e('Demo Mode:', 'wp-gallery-link'); ?></strong>
+                        <?php _e('Not seeing any albums? Try demo mode to see how the plugin works.', 'wp-gallery-link'); ?>
+                    </p>
+                    <a href="?page=wp-gallery-link-import&demo=true" class="button"><?php _e('Load Demo Albums', 'wp-gallery-link'); ?></a>
+                    
+                    <?php if (isset($_GET['demo']) && $_GET['demo'] === 'true'): ?>
+                        <p class="wpgl-demo-notice">
+                            <em><?php _e('Demo mode is active. The albums shown are for demonstration purposes only.', 'wp-gallery-link'); ?></em>
+                        </p>
+                    <?php endif; ?>
+                </div>
             </div>
         </div>
-
-        <script type="text/template" id="tmpl-wpgl-album">
-            <div class="wpgl-album" data-id="{{ data.id }}">
-                <div class="wpgl-album-img">
+        
+        <script type="text/html" id="tmpl-wpgl-album-item">
+            <div class="wpgl-album-item" data-id="{{ data.id }}">
+                <div class="wpgl-album-thumbnail">
                     <# if (data.coverPhotoBaseUrl) { #>
-                        <img src="{{ data.coverPhotoBaseUrl }}=w300-h200" alt="{{ data.title }}">
+                        <img src="{{ data.coverPhotoBaseUrl }}=w200-h200" alt="{{ data.title }}">
                     <# } else { #>
-                        <div class="wpgl-no-image"><?php _e('No Cover Image', 'wp-gallery-link'); ?></div>
+                        <div class="wpgl-no-thumbnail"><?php _e('No Cover', 'wp-gallery-link'); ?></div>
                     <# } #>
                 </div>
-                <div class="wpgl-album-info">
+                
+                <div class="wpgl-album-details">
                     <h3 class="wpgl-album-title">{{ data.title }}</h3>
+                    
                     <div class="wpgl-album-meta">
-                        <span class="wpgl-album-count">{{ data.mediaItemsCount }} <?php _e('photos', 'wp-gallery-link'); ?></span>
+                        <# if (data.mediaItemsCount) { #>
+                            <span class="wpgl-album-count">
+                                {{ data.mediaItemsCount }} <?php _e('items', 'wp-gallery-link'); ?>
+                            </span>
+                        <# } #>
                     </div>
+                    
                     <div class="wpgl-album-actions">
-                        <button class="button button-primary wpgl-import-album" data-id="{{ data.id }}">
-                            <?php _e('Import Album', 'wp-gallery-link'); ?>
-                        </button>
+                        <# if (data.imported) { #>
+                            <a href="{{ data.editLink }}" class="button button-secondary">
+                                <?php _e('Edit', 'wp-gallery-link'); ?>
+                            </a>
+                            <a href="{{ data.viewLink }}" class="button button-secondary" target="_blank">
+                                <?php _e('View', 'wp-gallery-link'); ?>
+                            </a>
+                        <# } else { #>
+                            <button class="button button-primary wpgl-import-album" data-id="{{ data.id }}">
+                                <?php _e('Import', 'wp-gallery-link'); ?>
+                            </button>
+                        <# } #>
                     </div>
                 </div>
             </div>
