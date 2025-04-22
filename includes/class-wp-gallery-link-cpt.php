@@ -1,3 +1,4 @@
+
 <?php
 /**
  * Custom Post Type for Google Photo Albums
@@ -324,13 +325,16 @@ class WP_Gallery_Link_CPT {
             return new WP_Error('album_exists', 'Album already imported', array('post_id' => $existing_album[0]->ID));
         }
 
-        // Create post for the album
+        // Create post for the album - explicitly set post_type to gphoto_album
         $post_args = array(
             'post_title' => sanitize_text_field($album_data['title']),
             'post_type' => 'gphoto_album', // Ensuring we use gphoto_album consistently
             'post_status' => 'publish'
         );
 
+        // Log the post args for debugging
+        error_log('WP Gallery Link CPT: Creating album with post_type: ' . $post_args['post_type']);
+        
         $post_id = wp_insert_post($post_args);
 
         if (is_wp_error($post_id)) {
@@ -338,13 +342,18 @@ class WP_Gallery_Link_CPT {
             return $post_id;
         }
 
+        // Verify the post was created with the correct post type
+        $created_post = get_post($post_id);
+        error_log('WP Gallery Link CPT: Created post type: ' . $created_post->post_type);
+        
         // Add meta information
         update_post_meta($post_id, '_gphoto_album_id', $album_data['id']);
+        update_post_meta($post_id, '_gphoto_album_url', $album_data['productUrl'] ?? '');
         update_post_meta($post_id, '_gphoto_album_cover_url', $album_data['coverPhotoBaseUrl'] ?? '');
-        update_post_meta($post_id, '_gphoto_album_photo_count', $album_data['mediaItemsCount'] ?? 0);
+        update_post_meta($post_id, '_gphoto_photo_count', $album_data['mediaItemsCount'] ?? 0);
         
         // Add more detailed log
-        error_log('WP Gallery Link CPT: Created album post - ID ' . $post_id . ', Google Album ID ' . $album_data['id'] . ', Post Type: gphoto_album');
+        error_log('WP Gallery Link CPT: Created album post - ID ' . $post_id . ', Google Album ID ' . $album_data['id'] . ', Post Type: ' . get_post_type($post_id));
 
         return $post_id;
     }

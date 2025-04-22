@@ -15,5 +15,11 @@ if (!defined('WPINC')) {
     die;
 }
 
+// Define plugin constants
+define('WP_GALLERY_LINK_VERSION', '1.0.0');
+define('WP_GALLERY_LINK_PATH', plugin_dir_path(__FILE__));
+define('WP_GALLERY_LINK_URL', plugin_dir_url(__FILE__));
+define('WP_GALLERY_LINK_DEBUG', true);
+
 // Include the main plugin file
 require_once plugin_dir_path(__FILE__) . 'wp-gallery-link.php';
