@@ -4,7 +4,7 @@
  * Plugin Name: Google Photos Albums
  * Plugin URI: https://example.com/google-photos-albums
  * Description: Connect your WordPress site with Google Photos albums, import album details, and organize them with categories.
- * Version: 1.0.5
+ * Version: 1.0.6
  * Author: Your Name
  * Author URI: https://example.com
  * Text Domain: wp-gallery-link
@@ -16,7 +16,7 @@ if (!defined('WPINC')) {
 }
 
 // Define plugin constants with an auto-incrementing version
-$current_version = '1.0.5';
+$current_version = '1.0.6';
 $build_number = time(); // Use timestamp to ensure unique version
 
 define('WP_GALLERY_LINK_VERSION', $current_version . '.' . $build_number);
@@ -85,3 +85,9 @@ function wpgl_register_scripts() {
     wp_register_script('wpgl-admin', WP_GALLERY_LINK_URL . 'assets/js/admin.js', array('jquery'), WP_GALLERY_LINK_VERSION, true);
 }
 add_action('admin_enqueue_scripts', 'wpgl_register_scripts');
+
+// Make sure admin class is initialized
+add_action('plugins_loaded', function() {
+    require_once WP_GALLERY_LINK_PATH . 'includes/class-wp-gallery-link-admin.php';
+    new WP_Gallery_Link_Admin();
+});

@@ -1,4 +1,3 @@
-
 <?php
 /**
  * Admin settings and functionality
@@ -15,7 +14,8 @@ class WP_Gallery_Link_Admin {
      * Constructor
      */
     public function __construct() {
-        add_action('admin_menu', array($this, 'add_admin_menu'));
+        // Make sure admin menu is added with proper priority
+        add_action('admin_menu', array($this, 'add_admin_menu'), 10);
         add_action('admin_enqueue_scripts', array($this, 'enqueue_scripts'));
         add_action('admin_init', array($this, 'register_settings'));
         
@@ -28,6 +28,7 @@ class WP_Gallery_Link_Admin {
      * Add admin menu items
      */
     public function add_admin_menu() {
+        // Main menu page
         add_menu_page(
             __('WP Gallery Link', 'wp-gallery-link'),
             __('WP Gallery Link', 'wp-gallery-link'),
@@ -38,6 +39,7 @@ class WP_Gallery_Link_Admin {
             30
         );
         
+        // Settings submenu (same as parent)
         add_submenu_page(
             'wp-gallery-link',
             __('Settings', 'wp-gallery-link'),
@@ -47,6 +49,7 @@ class WP_Gallery_Link_Admin {
             array($this, 'render_settings_page')
         );
         
+        // Import Albums submenu
         add_submenu_page(
             'wp-gallery-link',
             __('Import Albums', 'wp-gallery-link'),

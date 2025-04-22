@@ -1,3 +1,4 @@
+
 <?php
 /**
  * Main plugin file for Google Photos Albums
@@ -26,7 +27,7 @@ if (!defined('WP_GALLERY_LINK_URL')) {
 require_once WP_GALLERY_LINK_PATH . 'includes/class-wp-gallery-link.php';
 require_once WP_GALLERY_LINK_PATH . 'includes/functions-wp-gallery-link.php';
 
-// Initialize plugin
+// Initialize plugin - only after plugins_loaded
 add_action('plugins_loaded', 'wpgl_initialize');
 
 /**
