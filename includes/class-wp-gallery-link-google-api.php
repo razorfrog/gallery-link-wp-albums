@@ -1,3 +1,4 @@
+
 <?php
 /**
  * Google Photos API functionality
@@ -444,6 +445,11 @@ class WP_Gallery_Link_Google_API {
             'creation_time' => isset($body['mediaItemsContainerInfo']['creationTime']) ? $body['mediaItemsContainerInfo']['creationTime'] : 'Not available'
         ));
         
+        // Add detailed debug logging for the album API response
+        if (WP_GALLERY_LINK_DEBUG) {
+            error_log('WP Gallery Link: Full album response structure: ' . json_encode($body));
+        }
+        
         // Return album details with creation date included if available
         return array(
             'id' => $body['id'],
@@ -452,7 +458,10 @@ class WP_Gallery_Link_Google_API {
             'coverPhotoBaseUrl' => isset($body['coverPhotoBaseUrl']) ? $body['coverPhotoBaseUrl'] : '',
             'productUrl' => isset($body['productUrl']) ? $body['productUrl'] : '',
             'isWriteable' => isset($body['isWriteable']) ? $body['isWriteable'] : false,
-            'creationTime' => isset($body['mediaItemsContainerInfo']['creationTime']) ? $body['mediaItemsContainerInfo']['creationTime'] : ''
+            // Check multiple possible locations for the creation date
+            'creationTime' => isset($body['mediaItemsContainerInfo']['creationTime']) 
+                ? $body['mediaItemsContainerInfo']['creationTime'] 
+                : (isset($body['creationTime']) ? $body['creationTime'] : '')
         );
     }
     
@@ -512,12 +521,22 @@ class WP_Gallery_Link_Google_API {
             update_post_meta($post_id, '_gphoto_photo_count', intval($album_data['mediaItemsCount']));
         }
         
-        // Handle creation date properly - check mediaItemsContainerInfo first
+        // Handle creation date with extended debugging
         if (!empty($album_data['creationTime'])) {
-            $date = date('Y-m-d', strtotime($album_data['creationTime']));
-            update_post_meta($post_id, '_gphoto_album_date', $date);
+            $creation_time = $album_data['creationTime'];
+            // Log the raw creation time
+            wp_gallery_link()->log('Raw album creation time: ' . $creation_time, 'debug');
+            
+            // Parse the date and log the result
+            $parsed_timestamp = strtotime($creation_time);
+            $formatted_date = date('Y-m-d', $parsed_timestamp);
+            wp_gallery_link()->log('Parsed album date: ' . $formatted_date . ' (from timestamp ' . $parsed_timestamp . ')', 'debug');
+            
+            // Save the parsed date
+            update_post_meta($post_id, '_gphoto_album_date', $formatted_date);
         } else {
             // Set today's date as fallback
+            wp_gallery_link()->log('No creation date found, using today\'s date as fallback', 'info');
             update_post_meta($post_id, '_gphoto_album_date', date('Y-m-d'));
         }
 
@@ -525,10 +544,10 @@ class WP_Gallery_Link_Google_API {
             'post_id' => $post_id,
             'metadata' => array(
                 'album_id' => $album_data['id'],
-                'album_title' => $album_data['title'], // Log the actual title
+                'album_title' => $album_data['title'], 
                 'album_url' => !empty($album_data['productUrl']) ? $album_data['productUrl'] : '',
                 'album_date' => !empty($album_data['creationTime']) ? date('Y-m-d', strtotime($album_data['creationTime'])) : date('Y-m-d'),
-                'album_order' => 0 // Log the default order
+                'album_order' => 0
             )
         ));
 
@@ -698,3 +717,4 @@ class WP_Gallery_Link_Google_API {
         }
     }
 }
+
