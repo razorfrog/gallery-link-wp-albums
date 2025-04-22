@@ -1,3 +1,4 @@
+
 <?php
 /**
  * Shortcode functionality
@@ -37,11 +38,14 @@ class WP_Gallery_Link_Shortcode {
                 'orderby' => 'custom',
                 'order' => 'asc',
                 'limit' => -1,
-                'columns' => get_option('wpgl_shortcode_columns', 3)
+                'columns' => get_option('wpgl_shortcode_columns', 3),
+                'show_categories' => 'true',
             ),
             $atts,
             'wp_gallery_link'
         );
+        
+        $show_categories = filter_var($atts['show_categories'], FILTER_VALIDATE_BOOLEAN);
         
         // Start output buffering
         ob_start();
@@ -134,8 +138,9 @@ class WP_Gallery_Link_Shortcode {
                                         </div>
                                         
                                         <?php
-                                        $categories = get_the_terms(get_the_ID(), 'album_category');
-                                        if ($categories && !is_wp_error($categories)):
+                                        if ($show_categories) {
+                                            $categories = get_the_terms(get_the_ID(), 'album_category');
+                                            if ($categories && !is_wp_error($categories)):
                                         ?>
                                             <div class="wpgl-album-categories">
                                                 <?php
@@ -146,7 +151,10 @@ class WP_Gallery_Link_Shortcode {
                                                 echo esc_html(implode(', ', $category_names));
                                                 ?>
                                             </div>
-                                        <?php endif; ?>
+                                        <?php 
+                                            endif;
+                                        } // show_categories
+                                        ?>
                                     </div>
                                 </a>
                             </div>
