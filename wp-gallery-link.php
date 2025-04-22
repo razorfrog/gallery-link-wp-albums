@@ -1,3 +1,4 @@
+
 <?php
 /**
  * Main plugin file for Google Photos Albums
@@ -91,10 +92,6 @@ class WP_Gallery_Link {
             $this->google_api->is_connected = function() { return false; };
             $this->google_api->get_auth_url = function() { return '#'; };
         }
-        
-        // Setup AJAX hooks
-        add_action('wp_ajax_wpgl_fetch_albums', array($this, 'ajax_fetch_albums'));
-        add_action('wp_ajax_wpgl_import_album', array($this, 'ajax_import_album'));
     }
     
     /**

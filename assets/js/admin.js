@@ -72,7 +72,7 @@ jQuery(document).ready(function($) {
             // Create a default cover image if one isn't provided
             const coverImageUrl = album.coverPhotoBaseUrl || 'https://via.placeholder.com/200x200?text=No+Cover';
             
-            // Create album HTML directly
+            // Create album HTML directly without using a template
             const albumHtml = `
                 <div class="wpgl-album" data-id="${album.id}">
                     <div class="wpgl-album-cover-container">
@@ -91,6 +91,9 @@ jQuery(document).ready(function($) {
             `;
             
             $albumsGrid.append(albumHtml);
+            logDebug('Album rendered:', album.title);
+        } else {
+            logDebug('ERROR: Album grid container not found!');
         }
     }
     
@@ -153,7 +156,7 @@ jQuery(document).ready(function($) {
         
         const data = {
             action: 'wpgl_fetch_albums',
-            nonce: wpglAdmin.nonce // Use the nonce from wpglAdmin
+            nonce: wpglAdmin ? wpglAdmin.nonce : '' // Use the nonce from wpglAdmin if available
         };
         
         if (nextPageToken) {
@@ -161,9 +164,20 @@ jQuery(document).ready(function($) {
         }
         
         addLoadingLog('Fetching albums from Google Photos API...');
+        updateLoadingStatus('Fetching albums...');
         updateProgress(10);
         
+        // Log the AJAX URL and request data for debugging
         logDebug('AJAX request data:', data);
+        
+        if (typeof wpglAdmin === 'undefined' || !wpglAdmin.ajaxUrl) {
+            logDebug('ERROR: wpglAdmin.ajaxUrl is not defined!');
+            addLoadingLog('Error: WordPress AJAX URL not found. Is the plugin properly loaded?');
+            isLoading = false;
+            hideLoadingUI();
+            return;
+        }
+        
         logDebug('AJAX URL:', wpglAdmin.ajaxUrl);
         
         $.ajax({
@@ -373,11 +387,42 @@ jQuery(document).ready(function($) {
             logDebug('Start button found with ID:', startBtn.attr('id'));
         }
         
+        // Check if the album grid container exists
+        const albumsGrid = $('.wpgl-albums-grid');
+        if (albumsGrid.length === 0) {
+            console.error('WP Gallery Link: Albums grid container not found in DOM.');
+        } else {
+            logDebug('Albums grid found with class:', albumsGrid.attr('class'));
+        }
+        
         logDebug('Diagnostic completed');
     }
     
     // Run diagnostic on page load if in debug mode
     if (DEBUG) {
         runDiagnostic();
+        // Add immediate diagnostic info to console
+        console.log('WP Gallery Link: Script loaded and ready');
+        console.log('WP Gallery Link: Debug mode is active');
+        if (typeof wpglAdmin !== 'undefined') {
+            console.log('WP Gallery Link: wpglAdmin object is available', wpglAdmin);
+        } else {
+            console.error('WP Gallery Link: wpglAdmin object is not available!');
+        }
+    }
+    
+    // Explicitly trigger rendering of demo albums for testing
+    if (typeof wpglAdmin !== 'undefined' && wpglAdmin.demoMode === true) {
+        logDebug('Demo mode is active, will load sample albums automatically');
+        setTimeout(function() {
+            if ($('#wpgl-start-loading').length) {
+                $('#wpgl-start-loading').trigger('click');
+            } else {
+                logDebug('Could not find start loading button to auto-trigger');
+                // Try to manually start loading
+                resetAlbumLoading();
+                loadAlbums();
+            }
+        }, 500);
     }
 });

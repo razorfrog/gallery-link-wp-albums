@@ -95,10 +95,14 @@ class WP_Gallery_Link_Admin {
             true
         );
         
+        // Check if demo mode is enabled
+        $demo_mode = isset($_GET['demo']) && $_GET['demo'] === 'true';
+        
         wp_localize_script('wp-gallery-link-admin', 'wpglAdmin', array(
             'ajaxUrl' => admin_url('admin-ajax.php'),
             'nonce' => wp_create_nonce('wpgl_nonce'),
             'debugMode' => WP_GALLERY_LINK_DEBUG,
+            'demoMode' => $demo_mode,
             'loadAllAlbums' => true,
             'i18n' => array(
                 'importing' => __('Importing...', 'wp-gallery-link'),
@@ -115,6 +119,7 @@ class WP_Gallery_Link_Admin {
         
         if (WP_GALLERY_LINK_DEBUG) {
             error_log('WP Gallery Link Admin: Scripts and styles enqueued for ' . $hook);
+            error_log('WP Gallery Link Admin: Demo mode is ' . ($demo_mode ? 'enabled' : 'disabled'));
         }
     }
     
@@ -313,23 +318,27 @@ class WP_Gallery_Link_Admin {
             $is_connected = $main->google_api->is_connected();
         }
         
-        // Let's not redirect away just yet for debugging purposes
-        if (!$is_connected && !isset($_GET['demo'])) {
-            // For now, just show a notice instead of redirecting
-            // wp_redirect(admin_url('admin.php?page=wp-gallery-link'));
-            // exit;
-        }
+        // Demo mode check 
+        $demo_mode = isset($_GET['demo']) && $_GET['demo'] === 'true';
         ?>
         <div class="wrap">
             <h1><?php _e('Import Albums from Google Photos', 'wp-gallery-link'); ?></h1>
             
-            <?php if (!$is_connected && !isset($_GET['demo'])): ?>
+            <?php if (!$is_connected && !$demo_mode): ?>
                 <div class="notice notice-warning">
                     <p>
                         <?php _e('You are not connected to Google Photos. Some features may not work properly.', 'wp-gallery-link'); ?>
                         <a href="<?php echo esc_url(admin_url('admin.php?page=wp-gallery-link')); ?>" class="button button-small">
                             <?php _e('Go to Settings', 'wp-gallery-link'); ?>
                         </a>
+                    </p>
+                </div>
+            <?php endif; ?>
+
+            <?php if ($demo_mode): ?>
+                <div class="notice notice-info">
+                    <p>
+                        <?php _e('Demo mode is active. Sample albums will be automatically loaded for testing.', 'wp-gallery-link'); ?>
                     </p>
                 </div>
             <?php endif; ?>
@@ -383,7 +392,7 @@ class WP_Gallery_Link_Admin {
                     </p>
                     <a href="?page=wp-gallery-link-import&demo=true" class="button"><?php _e('Load Demo Albums', 'wp-gallery-link'); ?></a>
                     
-                    <?php if (isset($_GET['demo']) && $_GET['demo'] === 'true'): ?>
+                    <?php if ($demo_mode): ?>
                         <p class="wpgl-demo-notice">
                             <em><?php _e('Demo mode is active. The albums shown are for demonstration purposes only.', 'wp-gallery-link'); ?></em>
                         </p>

@@ -57,10 +57,49 @@ wpgl_include_file('class-wp-gallery-link-shortcode.php', $include_paths);
 // Load the main plugin file
 wpgl_include_file('wp-gallery-link.php', $include_paths);
 
-// Initialize admin functionality
-if (is_admin()) {
-    $wp_gallery_link_admin = new WP_Gallery_Link_Admin();
+// Create a function that initializes the plugin admin interface
+function wpgl_init_admin() {
+    if (is_admin()) {
+        // Initialize admin functionality
+        $wp_gallery_link_admin = new WP_Gallery_Link_Admin();
+        
+        // Add action to enable demo mode via URL parameter
+        add_action('admin_init', 'wpgl_check_demo_mode');
+    }
 }
+
+// Function to check if demo mode is enabled via URL
+function wpgl_check_demo_mode() {
+    if (isset($_GET['demo']) && $_GET['demo'] === 'true' && 
+        isset($_GET['page']) && $_GET['page'] === 'wp-gallery-link-import') {
+        // Do nothing here, we'll handle this in the admin.js script
+    }
+}
+
+// Initialize admin functionality
+wpgl_init_admin();
 
 // Initialize shortcode functionality
 $wp_gallery_link_shortcode = new WP_Gallery_Link_Shortcode();
+
+// Add action to prevent template not found errors in AJAX responses
+add_action('wp_ajax_wpgl_fetch_albums', 'wpgl_ajax_fetch_albums_wrapper');
+function wpgl_ajax_fetch_albums_wrapper() {
+    $main = wp_gallery_link();
+    if (method_exists($main, 'ajax_fetch_albums')) {
+        $main->ajax_fetch_albums();
+    } else {
+        wp_send_json_error(array('message' => 'Method ajax_fetch_albums not found in main plugin class'));
+    }
+}
+
+// Add action to handle album import
+add_action('wp_ajax_wpgl_import_album', 'wpgl_ajax_import_album_wrapper');
+function wpgl_ajax_import_album_wrapper() {
+    $main = wp_gallery_link();
+    if (method_exists($main, 'ajax_import_album')) {
+        $main->ajax_import_album();
+    } else {
+        wp_send_json_error(array('message' => 'Method ajax_import_album not found in main plugin class'));
+    }
+}
