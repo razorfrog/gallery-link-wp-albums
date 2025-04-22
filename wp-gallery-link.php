@@ -21,12 +21,12 @@ class WP_Gallery_Link {
     /**
      * Instance of the Google API class
      */
-    public $google_api; // Changed from private to public
+    public $google_api; // Public to allow access from other classes
     
     /**
      * Instance of the CPT class
      */
-    private $cpt;
+    public $cpt; // Changed from private to public to prevent access issues
     
     /**
      * Debug log
@@ -54,7 +54,7 @@ class WP_Gallery_Link {
         
         // Check if CPT class exists, if not include it
         if (!class_exists('WP_Gallery_Link_CPT')) {
-            require_once plugin_dir_path(__FILE__) . 'includes/class-wp-gallery-link-cpt.php';
+            require_once WP_GALLERY_LINK_PATH . 'src/includes/class-wp-gallery-link-cpt.php';
             if (WP_GALLERY_LINK_DEBUG) {
                 $this->log('WP Gallery Link: CPT class file included', 'info');
             }
@@ -65,8 +65,8 @@ class WP_Gallery_Link {
         
         // Check if Google API class exists, if not include it
         if (!class_exists('WP_Gallery_Link_Google_API')) { 
-            if (file_exists(plugin_dir_path(__FILE__) . 'includes/class-wp-gallery-link-google-api.php')) {
-                require_once plugin_dir_path(__FILE__) . 'includes/class-wp-gallery-link-google-api.php';
+            if (file_exists(WP_GALLERY_LINK_PATH . 'src/includes/class-wp-gallery-link-google-api.php')) {
+                require_once WP_GALLERY_LINK_PATH . 'src/includes/class-wp-gallery-link-google-api.php';
                 if (WP_GALLERY_LINK_DEBUG) {
                     $this->log('WP Gallery Link: Google API class file included', 'info');
                 }
@@ -105,6 +105,8 @@ class WP_Gallery_Link {
             
             if ($level === 'error') {
                 error_log('[WP Gallery Link] [ERROR] ' . $message);
+            } else {
+                error_log('[WP Gallery Link] [' . strtoupper($level) . '] ' . $message);
             }
         }
     }

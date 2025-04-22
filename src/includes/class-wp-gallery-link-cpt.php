@@ -1,3 +1,4 @@
+
 <?php
 /**
  * Custom Post Type for Google Photo Albums
@@ -14,6 +15,10 @@ class WP_Gallery_Link_CPT {
         add_action('save_post', array($this, 'save_meta_box_data'));
         add_filter('manage_gphoto_album_posts_columns', array($this, 'set_custom_columns'));
         add_action('manage_gphoto_album_posts_custom_column', array($this, 'custom_column_content'), 10, 2);
+        
+        if (WP_GALLERY_LINK_DEBUG) {
+            error_log('WP Gallery Link CPT: Class initialized');
+        }
     }
     
     /**
@@ -55,6 +60,10 @@ class WP_Gallery_Link_CPT {
         );
 
         register_post_type('gphoto_album', $args);
+        
+        if (WP_GALLERY_LINK_DEBUG) {
+            error_log('WP Gallery Link CPT: Registered post type gphoto_album');
+        }
     }
     
     /**
@@ -312,6 +321,7 @@ class WP_Gallery_Link_CPT {
      */
     public function create_album_from_google($album_data) {
         if (empty($album_data['id']) || empty($album_data['title'])) {
+            error_log('WP Gallery Link CPT: Invalid album data provided');
             return new WP_Error('invalid_album_data', __('Invalid album data provided', 'wp-gallery-link'));
         }
         
@@ -323,23 +333,39 @@ class WP_Gallery_Link_CPT {
             'posts_per_page' => 1,
         ));
         
+        if (WP_GALLERY_LINK_DEBUG) {
+            error_log('WP Gallery Link CPT: Checking for existing album with Google ID ' . $album_data['id']);
+            error_log('WP Gallery Link CPT: Found ' . count($existing_albums) . ' existing albums');
+        }
+        
         if (!empty($existing_albums)) {
             return new WP_Error('album_exists', __('Album already exists', 'wp-gallery-link'), array('post_id' => $existing_albums[0]->ID));
         }
         
         // Create post object
         $post_args = array(
-            'post_title'   => $album_data['title'],
-            'post_content' => isset($album_data['description']) ? $album_data['description'] : '',
+            'post_title'   => sanitize_text_field($album_data['title']),
+            'post_content' => isset($album_data['description']) ? sanitize_textarea_field($album_data['description']) : '',
             'post_status'  => 'publish',
             'post_type'    => 'gphoto_album',
         );
+        
+        if (WP_GALLERY_LINK_DEBUG) {
+            error_log('WP Gallery Link CPT: Creating new album post with post_type: ' . $post_args['post_type']);
+        }
         
         // Insert the post into the database
         $post_id = wp_insert_post($post_args);
         
         if (is_wp_error($post_id)) {
+            error_log('WP Gallery Link CPT: Error creating album post - ' . $post_id->get_error_message());
             return $post_id;
+        }
+        
+        // Verify the post was created with the correct post type
+        $created_post = get_post($post_id);
+        if (WP_GALLERY_LINK_DEBUG) {
+            error_log('WP Gallery Link CPT: Created post ID ' . $post_id . ' with post_type: ' . $created_post->post_type);
         }
         
         // Save album metadata
@@ -361,22 +387,32 @@ class WP_Gallery_Link_CPT {
             update_post_meta($post_id, '_gphoto_photo_count', intval($album_data['mediaItemsCount']));
         }
         
-        // If album has a cover photo, set as featured image
-        if (!empty($album_data['coverPhotoBaseUrl']) && function_exists('media_sideload_image')) {
-            $cover_url = $album_data['coverPhotoBaseUrl'] . '=w800-h800';
-            $tmp = download_url($cover_url);
+        // Save cover photo URL if available
+        if (!empty($album_data['coverPhotoBaseUrl'])) {
+            update_post_meta($post_id, '_gphoto_album_cover_url', esc_url_raw($album_data['coverPhotoBaseUrl']));
             
-            if (!is_wp_error($tmp)) {
-                $file_array = array(
-                    'name' => sanitize_title($album_data['title']) . '-cover.jpg',
-                    'tmp_name' => $tmp
-                );
+            // Try to set as featured image if media_sideload_image exists
+            if (function_exists('media_sideload_image')) {
+                $cover_url = $album_data['coverPhotoBaseUrl'] . '=w800-h800';
+                $tmp = download_url($cover_url);
                 
-                // Use media_handle_sideload to add it to the media library and attach it to the post
-                $thumbnail_id = media_handle_sideload($file_array, $post_id);
-                
-                if (!is_wp_error($thumbnail_id)) {
-                    set_post_thumbnail($post_id, $thumbnail_id);
+                if (!is_wp_error($tmp)) {
+                    $file_array = array(
+                        'name' => sanitize_title($album_data['title']) . '-cover.jpg',
+                        'tmp_name' => $tmp
+                    );
+                    
+                    // Use media_handle_sideload to add it to the media library and attach it to the post
+                    $thumbnail_id = media_handle_sideload($file_array, $post_id);
+                    
+                    if (!is_wp_error($thumbnail_id)) {
+                        set_post_thumbnail($post_id, $thumbnail_id);
+                        if (WP_GALLERY_LINK_DEBUG) {
+                            error_log('WP Gallery Link CPT: Set featured image for album - ID ' . $thumbnail_id);
+                        }
+                    } else {
+                        error_log('WP Gallery Link CPT: Error setting featured image - ' . $thumbnail_id->get_error_message());
+                    }
                 }
             }
         }
