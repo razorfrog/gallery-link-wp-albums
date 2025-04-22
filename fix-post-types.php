@@ -1,4 +1,3 @@
-
 <?php
 /**
  * Script to fix post types from 'wp_gallery_album' to 'gphoto_album'
