@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -5,7 +6,7 @@ import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { AlbumCard } from "@/components/AlbumCard";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, Info } from "lucide-react";
 
 type Album = {
   id: number;
@@ -200,7 +201,7 @@ const Index = () => {
             <Progress value={progress} className="h-2" />
             
             <Alert className="bg-blue-50 border-blue-200">
-              <InfoIcon className="h-4 w-4" />
+              <Info className="h-4 w-4" />
               <AlertTitle>Loading Status Log</AlertTitle>
               <AlertDescription>
                 <div className="mt-2 max-h-40 overflow-y-auto border rounded-md p-2 bg-white">
