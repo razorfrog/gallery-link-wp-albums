@@ -26,28 +26,36 @@ if (WP_GALLERY_LINK_DEBUG) {
     error_log('Google Photos Albums plugin initialized with path: ' . WP_GALLERY_LINK_PATH);
 }
 
-// Include the necessary files
-// First check in the includes directory
-if (file_exists(WP_GALLERY_LINK_PATH . 'includes/class-wp-gallery-link-cpt.php')) {
-    require_once WP_GALLERY_LINK_PATH . 'includes/class-wp-gallery-link-cpt.php';
-} else {
-    error_log('Critical error: class-wp-gallery-link-cpt.php not found in includes directory');
+// Include the necessary files - search in multiple locations to support different folder structures
+$include_paths = array(
+    WP_GALLERY_LINK_PATH . 'includes/',
+    WP_GALLERY_LINK_PATH . 'src/includes/',
+    WP_GALLERY_LINK_PATH
+);
+
+// Function to include file from first available path
+function wpgl_include_file($filename, $paths) {
+    foreach ($paths as $path) {
+        $full_path = $path . $filename;
+        if (file_exists($full_path)) {
+            require_once $full_path;
+            if (WP_GALLERY_LINK_DEBUG) {
+                error_log('Successfully included: ' . $full_path);
+            }
+            return true;
+        }
+    }
+    error_log('Critical error: ' . $filename . ' not found in any include path');
+    return false;
 }
 
-if (file_exists(WP_GALLERY_LINK_PATH . 'includes/class-wp-gallery-link-admin.php')) {
-    require_once WP_GALLERY_LINK_PATH . 'includes/class-wp-gallery-link-admin.php';
-} else {
-    error_log('Warning: class-wp-gallery-link-admin.php not found in includes directory');
-}
-
-if (file_exists(WP_GALLERY_LINK_PATH . 'includes/class-wp-gallery-link-shortcode.php')) {
-    require_once WP_GALLERY_LINK_PATH . 'includes/class-wp-gallery-link-shortcode.php';
-} else {
-    error_log('Warning: class-wp-gallery-link-shortcode.php not found in includes directory');
-}
+// Include the necessary class files
+wpgl_include_file('class-wp-gallery-link-cpt.php', $include_paths);
+wpgl_include_file('class-wp-gallery-link-admin.php', $include_paths);
+wpgl_include_file('class-wp-gallery-link-shortcode.php', $include_paths);
 
 // Load the main plugin file
-require_once WP_GALLERY_LINK_PATH . 'wp-gallery-link.php';
+wpgl_include_file('wp-gallery-link.php', $include_paths);
 
 // Initialize admin functionality
 if (is_admin()) {

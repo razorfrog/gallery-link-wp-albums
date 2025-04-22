@@ -69,14 +69,14 @@ jQuery(document).ready(function($) {
         const $albumsGrid = $('.wpgl-albums-grid');
         
         if ($albumsGrid.length) {
-            const coverImage = album.coverPhotoBaseUrl 
-                ? `<img src="${album.coverPhotoBaseUrl}=w200-h200" alt="${album.title}" class="wpgl-album-cover">` 
-                : `<div class="wpgl-no-cover">No Cover Image</div>`;
-                
+            // Create a default cover image if one isn't provided
+            const coverImageUrl = album.coverPhotoBaseUrl || 'https://via.placeholder.com/200x200?text=No+Cover';
+            
+            // Create album HTML directly
             const albumHtml = `
                 <div class="wpgl-album" data-id="${album.id}">
                     <div class="wpgl-album-cover-container">
-                        ${coverImage}
+                        <img src="${coverImageUrl}" alt="${album.title}" class="wpgl-album-cover">
                     </div>
                     <div class="wpgl-album-info">
                         <h3 class="wpgl-album-title">${album.title}</h3>
@@ -350,6 +350,14 @@ jQuery(document).ready(function($) {
     // Run diagnostic check on page load
     function runDiagnostic() {
         logDebug('Running diagnostic check...');
+        
+        // Debug information for templates
+        logDebug('Checking for album template elements');
+        if ($('.wpgl-album-template').length) {
+            logDebug('Found album template element');
+        } else {
+            logDebug('No album template element found, will use direct HTML rendering');
+        }
         
         // Check if we have the wpglAdmin object
         if (typeof wpglAdmin === 'undefined') {

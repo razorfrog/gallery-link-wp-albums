@@ -1,4 +1,3 @@
-
 <?php
 /**
  * Main plugin file for Google Photos Albums
@@ -100,10 +99,6 @@ class WP_Gallery_Link {
     
     /**
      * Add a log entry
-     *
-     * @param string $message The log message
-     * @param string $level The log level (debug, info, warning, error)
-     * @param mixed $context Additional context data
      */
     public function log($message, $level = 'debug', $context = null) {
         if (WP_GALLERY_LINK_DEBUG) {
@@ -124,8 +119,6 @@ class WP_Gallery_Link {
     
     /**
      * Get the debug log
-     *
-     * @return array The debug log entries
      */
     public function get_debug_log() {
         return $this->debug_log;
@@ -144,35 +137,55 @@ class WP_Gallery_Link {
         
         $this->log('WP Gallery Link: Fetching albums via AJAX', 'info');
         
-        // For demo purposes, we'll return some sample albums
+        // For demo purposes, we'll generate more detailed sample albums
         $sample_albums = array(
             array(
                 'id' => 'album1',
                 'title' => 'Sample Album 1',
                 'productUrl' => 'https://photos.google.com/album/sample1',
                 'mediaItemsCount' => 25,
-                'coverPhotoBaseUrl' => 'https://via.placeholder.com/200x200?text=Album1'
+                'coverPhotoBaseUrl' => 'https://via.placeholder.com/200x200?text=Album1',
+                'creationTime' => '2023-01-15T10:30:00Z'
             ),
             array(
                 'id' => 'album2',
                 'title' => 'Sample Album 2',
                 'productUrl' => 'https://photos.google.com/album/sample2',
                 'mediaItemsCount' => 15,
-                'coverPhotoBaseUrl' => 'https://via.placeholder.com/200x200?text=Album2'
+                'coverPhotoBaseUrl' => 'https://via.placeholder.com/200x200?text=Album2',
+                'creationTime' => '2023-02-20T14:45:00Z'
             ),
             array(
                 'id' => 'album3',
                 'title' => 'Sample Album 3',
                 'productUrl' => 'https://photos.google.com/album/sample3',
                 'mediaItemsCount' => 42,
-                'coverPhotoBaseUrl' => 'https://via.placeholder.com/200x200?text=Album3'
+                'coverPhotoBaseUrl' => 'https://via.placeholder.com/200x200?text=Album3',
+                'creationTime' => '2023-03-10T09:15:00Z'
             ),
             array(
                 'id' => 'album4',
                 'title' => 'Sample Album 4',
                 'productUrl' => 'https://photos.google.com/album/sample4',
                 'mediaItemsCount' => 8,
-                'coverPhotoBaseUrl' => 'https://via.placeholder.com/200x200?text=Album4'
+                'coverPhotoBaseUrl' => 'https://via.placeholder.com/200x200?text=Album4',
+                'creationTime' => '2023-04-05T16:20:00Z'
+            ),
+            array(
+                'id' => 'album5',
+                'title' => 'Family Vacation 2023',
+                'productUrl' => 'https://photos.google.com/album/family',
+                'mediaItemsCount' => 120,
+                'coverPhotoBaseUrl' => 'https://via.placeholder.com/200x200?text=Family',
+                'creationTime' => '2023-07-15T08:30:00Z'
+            ),
+            array(
+                'id' => 'album6',
+                'title' => 'Birthday Party',
+                'productUrl' => 'https://photos.google.com/album/birthday',
+                'mediaItemsCount' => 65,
+                'coverPhotoBaseUrl' => 'https://via.placeholder.com/200x200?text=Birthday',
+                'creationTime' => '2023-09-22T18:45:00Z'
             )
         );
         
