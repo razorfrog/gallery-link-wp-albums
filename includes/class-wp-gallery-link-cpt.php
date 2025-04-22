@@ -16,7 +16,7 @@ public function create_album_from_google($album_data) {
     // Create post for the album
     $post_args = array(
         'post_title' => sanitize_text_field($album_data['title']),
-        'post_type' => 'gphoto_album',
+        'post_type' => 'gphoto_album', // Ensuring we use gphoto_album consistently
         'post_status' => 'publish'
     );
 
@@ -31,8 +31,9 @@ public function create_album_from_google($album_data) {
     update_post_meta($post_id, '_gphoto_album_id', $album_data['id']);
     update_post_meta($post_id, '_gphoto_album_cover_url', $album_data['coverPhotoBaseUrl'] ?? '');
     update_post_meta($post_id, '_gphoto_album_photo_count', $album_data['mediaItemsCount'] ?? 0);
-
-    error_log('WP Gallery Link CPT: Created album post - ID ' . $post_id . ', Google Album ID ' . $album_data['id']);
+    
+    // Add more detailed log
+    error_log('WP Gallery Link CPT: Created album post - ID ' . $post_id . ', Google Album ID ' . $album_data['id'] . ', Post Type: gphoto_album');
 
     return $post_id;
 }

@@ -30,6 +30,9 @@ public function ajax_import_album() {
         return;
     }
     
+    // Debug album data
+    error_log('WP Gallery Link: Album data retrieved - Title: ' . $album_data['title']);
+    
     // Create album post
     $post_id = $this->cpt->create_album_from_google($album_data);
     
