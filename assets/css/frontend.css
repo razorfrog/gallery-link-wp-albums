@@ -1,3 +1,4 @@
+
 /* WP Gallery Link Frontend Styles */
 
 .wp-gallery-link-container {
@@ -82,7 +83,6 @@
     overflow: hidden;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
     transition: transform 0.3s ease, box-shadow 0.3s ease;
-    container-type: inline-size;
 }
 
 .wpgl-album:hover {
@@ -165,17 +165,33 @@
     color: #666;
 }
 
-/* Responsive stacking for album meta on small album card containers (container query) */
-@container (max-width: 300px) {
-    .wpgl-album-meta {
+/* Instead of container queries, use a media query targeting small screens but
+   with additional specific styling targeting narrow containers */
+@media (max-width: 576px) {
+    .wpgl-album-grid .wpgl-album .wpgl-album-meta {
         flex-direction: column;
         align-items: flex-start;
         gap: 2px;
     }
-    .wpgl-album-meta > * {
+    
+    .wpgl-album-grid .wpgl-album .wpgl-album-meta > * {
         width: 100%;
         margin-bottom: 2px;
     }
+}
+
+/* Also add specific styles for narrow columns regardless of screen size */
+.wpgl-columns-1 .wpgl-album .wpgl-album-meta,
+.wpgl-columns-2 .wpgl-album .wpgl-album-meta {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+}
+
+.wpgl-columns-1 .wpgl-album .wpgl-album-meta > *,
+.wpgl-columns-2 .wpgl-album .wpgl-album-meta > * {
+    width: 100%;
+    margin-bottom: 2px;
 }
 
 .wpgl-album-categories {
