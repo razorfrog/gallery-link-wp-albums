@@ -1,4 +1,3 @@
-
 <?php
 /**
  * Admin settings and functionality
@@ -80,9 +79,13 @@ class WP_Gallery_Link_Admin {
                 'import_success' => __('Album imported successfully!', 'wp-gallery-link'),
                 'import_error' => __('Error importing album:', 'wp-gallery-link'),
                 'loading' => __('Loading albums...', 'wp-gallery-link'),
+                'start' => __('Start Loading Albums', 'wp-gallery-link'),
+                'stop' => __('Stop Loading', 'wp-gallery-link'),
+                'albums_fetched' => __('Albums fetched:', 'wp-gallery-link'),
                 'load_more' => __('Load more', 'wp-gallery-link'),
                 'noAlbums' => __('No albums found.', 'wp-gallery-link'),
-                'error' => __('Error:', 'wp-gallery-link')
+                'error' => __('Error:', 'wp-gallery-link'),
+                'stopped' => __('Loading stopped.', 'wp-gallery-link')
             )
         ));
     }
@@ -261,61 +264,63 @@ class WP_Gallery_Link_Admin {
         if (!current_user_can('manage_options')) {
             return;
         }
-        
+
         $google_api = wp_gallery_link()->google_api;
-        
+
         if (!$google_api->is_connected()) {
             wp_redirect(admin_url('admin.php?page=wp-gallery-link'));
             exit;
         }
-        
+
         // Check if we've just imported an album
         $album_imported = isset($_GET['imported']) ? absint($_GET['imported']) : 0;
         ?>
         <div class="wrap">
             <h1><?php _e('Import Albums from Google Photos', 'wp-gallery-link'); ?></h1>
-            
+
             <?php if ($album_imported > 0): ?>
                 <div class="notice notice-success is-dismissible">
                     <p><?php _e('Album imported successfully!', 'wp-gallery-link'); ?></p>
                 </div>
             <?php endif; ?>
-            
+
             <div class="wpgl-import-container">
                 <div class="wpgl-import-header">
                     <p>
                         <?php _e('Select albums to import from your Google Photos account. You can then edit them, assign categories, and customize their display.', 'wp-gallery-link'); ?>
                     </p>
-                    <button class="button button-primary wpgl-load-albums">
-                        <?php _e('Load Albums from Google Photos', 'wp-gallery-link'); ?>
+                    <button id="wpgl-start-loading" class="button button-primary">
+                        <?php _e('Start Loading Albums', 'wp-gallery-link'); ?>
+                    </button>
+                    <button id="wpgl-stop-loading" class="button" style="display:none;">
+                        <?php _e('Stop Loading', 'wp-gallery-link'); ?>
                     </button>
                 </div>
-                
-                <div class="wpgl-loading-container">
+
+                <div class="wpgl-loading-container" style="display: none;">
                     <div class="wpgl-loading-status">
                         <span class="spinner is-active"></span>
                         <span class="wpgl-loading-text"><?php _e('Loading albums...', 'wp-gallery-link'); ?></span>
                     </div>
-                    
                     <div class="wpgl-progress">
                         <div class="wpgl-progress-bar">
                             <div class="wpgl-progress-value" style="width: 0%"></div>
                         </div>
                     </div>
-                    
-                    <div class="wpgl-loading-log-wrap">
-                        <h4><?php _e('Loading Log', 'wp-gallery-link'); ?></h4>
-                        <div class="wpgl-loading-log"></div>
-                    </div>
                 </div>
-                
+
+                <div class="wpgl-albums-log-container" style="display:none;">
+                    <h4><?php _e('Real-time Album Titles', 'wp-gallery-link'); ?></h4>
+                    <ul id="wpgl-albums-title-list" style="max-height:200px;overflow:auto;margin:0;padding-left:1em;"></ul>
+                </div>
+
                 <div class="wpgl-albums-container" style="display: none;">
                     <h2><?php _e('Available Albums', 'wp-gallery-link'); ?></h2>
                     <div class="wpgl-albums-grid"></div>
                 </div>
             </div>
         </div>
-        
+
         <script type="text/template" id="tmpl-wpgl-album">
             <div class="wpgl-album" data-id="{{ data.id }}">
                 <div class="wpgl-album-img">
