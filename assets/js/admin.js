@@ -1,3 +1,4 @@
+
 jQuery(document).ready(function($) {
     'use strict';
     
@@ -391,6 +392,8 @@ jQuery(document).ready(function($) {
                     console.log('%c--- ALBUM DATE DEBUG INFO ---', 'background:#3498db; color:white; padding:5px; font-weight:bold');
                     console.log('Raw Album Date:', response.data.album_date_raw || 'Not provided');
                     console.log('Saved Album Date:', response.data.album_date_saved || 'Not provided');
+                    console.log('Raw API Response:', response.data.raw_api_response || 'Not provided');
+                    
                     console.table({
                         'Album ID': albumId,
                         'Album Title': response.data.album_title || 'Unknown',
@@ -400,14 +403,24 @@ jQuery(document).ready(function($) {
                     });
                     console.log('%c--- END DATE DEBUG INFO ---', 'background:#3498db; color:white; padding:5px; font-weight:bold');
                     
-                    // CRITICAL FIX: Don't redirect, show debug info on the page instead
+                    // Create a detailed debug popup with formatted raw API response
+                    const rawApiResponse = response.data.raw_api_response ? 
+                        JSON.stringify(response.data.raw_api_response, null, 2) : 
+                        'No raw API response data available';
+                    
                     const debugHtml = `
-                        <div class="wpgl-debug-info" style="margin-top: 20px; padding: 15px; background: #f1f1f1; border-left: 5px solid #e74c3c; position:fixed; top:50px; right:20px; width:400px; z-index:9999; box-shadow:0 0 15px rgba(0,0,0,0.2);">
+                        <div class="wpgl-debug-info" style="margin-top: 20px; padding: 15px; background: #f1f1f1; border-left: 5px solid #e74c3c; position:fixed; top:50px; right:20px; width:80%; max-width:800px; max-height:80%; overflow-y:auto; z-index:9999; box-shadow:0 0 15px rgba(0,0,0,0.2);">
                             <h3 style="margin-top:0;">Album Import Debug Info</h3>
                             <p><strong>Album ID:</strong> ${albumId}</p>
                             <p><strong>Post ID:</strong> ${response.data.post_id || 'Unknown'}</p>
                             <p><strong>Raw Creation Date:</strong> <span style="background:#ffe6cc; padding:3px;">${response.data.album_date_raw || 'Not provided'}</span></p>
                             <p><strong>Saved Date:</strong> <span style="background:#d4edda; padding:3px;">${response.data.album_date_saved || 'Not provided'}</span></p>
+                            
+                            <h4 style="margin-top:20px;">Complete Google Photos API Response:</h4>
+                            <div style="max-height:300px; overflow:auto; background:#f8f9fa; padding:10px; border:1px solid #ddd; margin-bottom:15px;">
+                                <pre style="white-space:pre-wrap; word-break:break-all;">${rawApiResponse}</pre>
+                            </div>
+                            
                             <div style="margin-top:10px;">
                                 <a href="${response.data.edit_url}" class="button button-primary">Edit Album</a>
                                 <button class="button dismiss-debug" style="margin-left:10px;">Dismiss</button>
@@ -687,3 +700,4 @@ jQuery(document).ready(function($) {
         });
     });
 });
+

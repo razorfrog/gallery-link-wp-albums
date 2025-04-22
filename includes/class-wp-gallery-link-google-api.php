@@ -1,3 +1,4 @@
+
 <?php
 /**
  * Google Photos API functionality
@@ -395,7 +396,8 @@ class WP_Gallery_Link_Google_API {
             'album_date_raw' => $album_data['creationTime'], // Include raw date for debugging
             'album_date_saved' => get_post_meta($post_id, '_gphoto_album_date', true), // Include what was actually saved
             'timestamp' => current_time('mysql'),
-            'debug_redirect' => 'false' // Flag to disable redirect
+            'debug_redirect' => 'false', // Flag to disable redirect
+            'raw_api_response' => $album_data['_raw_response'] // Include the full API response
         ));
     }
     
@@ -443,8 +445,8 @@ class WP_Gallery_Link_Google_API {
             return new WP_Error('api_error', $error_message);
         }
         
-        // Write the FULL ALBUM response to PHP error log for inspection (added in v1.0.10)
-        error_log('GOOGLE PHOTOS FULL ALBUM RESPONSE: ' . wp_json_encode($body));
+        // Write the FULL ALBUM response to error logs for inspection
+        error_log('GOOGLE PHOTOS FULL API RESPONSE: ' . wp_json_encode($body));
         wp_gallery_link()->log('Complete album response', 'debug', $body);
         
         // DIRECTLY CHECK AND LOG THE creationTime FROM THE ROOT LEVEL
@@ -786,3 +788,4 @@ class WP_Gallery_Link_Google_API {
         }
     }
 }
+
