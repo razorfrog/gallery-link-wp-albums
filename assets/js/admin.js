@@ -1,3 +1,4 @@
+
 jQuery(document).ready(function($) {
     'use strict';
     
@@ -624,6 +625,14 @@ jQuery(document).ready(function($) {
         e.preventDefault(); // Prevent demo mode
         logDebug('Demo mode requested but blocked');
         alert('Demo mode has been disabled. The system will use real Google Photos API data.');
+    });
+    
+    // Individual album import button click
+    $(document).on('click', '.wpgl-import-album', function(e) {
+        e.preventDefault();
+        const albumId = $(this).data('id');
+        console.log('Import button clicked for album ID:', albumId);
+        handleImportAlbum(albumId);
     });
     
     // Run diagnostic on page load if in debug mode
