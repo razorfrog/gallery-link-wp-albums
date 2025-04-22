@@ -1,4 +1,3 @@
-
 <?php
 /**
  * Main plugin file for Google Photos Albums
@@ -23,9 +22,8 @@ if (!defined('WP_GALLERY_LINK_URL')) {
     define('WP_GALLERY_LINK_URL', plugin_dir_url(__FILE__));
 }
 
-if (!defined('WP_GALLERY_LINK_VERSION')) {
-    define('WP_GALLERY_LINK_VERSION', '1.0.1'); // Updated version number
-}
+// Remove hardcoded version, as it will now come from google-photos-albums.php
+// Define('WP_GALLERY_LINK_VERSION', '1.0.1');
 
 // Load main plugin class and helpers
 require_once WP_GALLERY_LINK_PATH . 'includes/class-wp-gallery-link.php';
